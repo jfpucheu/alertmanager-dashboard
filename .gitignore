@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# runtime data (alertmanager list is persisted locally, not in git)
+/data/alertmanagers.json

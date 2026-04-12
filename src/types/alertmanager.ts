@@ -1,0 +1,60 @@
+export type Severity = 'critical' | 'error' | 'warning' | 'info' | 'none';
+
+export const SEVERITIES: Severity[] = ['critical', 'error', 'warning', 'info', 'none'];
+
+export interface AlertManager {
+  id: string;
+  name: string;
+  url: string;
+  createdAt: string;
+}
+
+export interface AlertLabel {
+  [key: string]: string;
+}
+
+export interface Alert {
+  labels: AlertLabel;
+  annotations: Record<string, string>;
+  startsAt: string;
+  endsAt: string;
+  updatedAt: string;
+  status: {
+    state: 'active' | 'suppressed' | 'unprocessed';
+    silencedBy: string[];
+    inhibitedBy: string[];
+  };
+  receivers: { name: string }[];
+  fingerprint: string;
+}
+
+export interface SeverityCounts {
+  critical: number;
+  error: number;
+  warning: number;
+  info: number;
+  none: number;
+}
+
+export interface AlertManagerStatus {
+  alertManager: AlertManager;
+  alerts: Alert[];
+  severityCounts: SeverityCounts;
+  reachable: boolean;
+  error?: string;
+}
+
+export interface SilenceMatcher {
+  name: string;
+  value: string;
+  isRegex: boolean;
+  isEqual: boolean;
+}
+
+export interface SilencePayload {
+  matchers: SilenceMatcher[];
+  startsAt: string;
+  endsAt: string;
+  comment: string;
+  createdBy: string;
+}

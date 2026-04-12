@@ -1,36 +1,60 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AlertManager Dashboard
+
+A central dashboard to monitor alerts from multiple [Prometheus Alertmanager](https://prometheus.io/docs/alerting/latest/alertmanager/) instances.
+
+## Features
+
+- **Overview page** — 5 severity blocks (Critical, Error, Warning, Info, None) showing global alert counts across all connected Alertmanagers
+- **AlertManagers page** — list all connected instances with per-severity alert counts, expandable alert tables
+- **Add/Remove Alertmanagers** — add any Alertmanager URL to monitor
+- **Create Silences** — create a silence on any Alertmanager, either globally (custom matchers) or directly on a specific alert (matchers pre-filled)
+- **Auto-refresh** every 30 seconds
+
+## Stack
+
+- [Next.js 16](https://nextjs.org/) (App Router, TypeScript)
+- [Tailwind CSS](https://tailwindcss.com/)
+- Alertmanager API v2
 
 ## Getting Started
 
-First, run the development server:
-
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Configuration
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Alertmanager URLs are stored in `data/alertmanagers.json` (created automatically at runtime, excluded from git).
 
-## Learn More
+To add an Alertmanager, use the **AlertManagers** page in the UI, or POST directly:
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+curl -X POST http://localhost:3000/api/alertmanagers \
+  -H 'Content-Type: application/json' \
+  -d '{"name": "Production", "url": "http://alertmanager:9093"}'
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## API
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/alertmanagers` | List all configured Alertmanagers |
+| `POST` | `/api/alertmanagers` | Add an Alertmanager (`{name, url}`) |
+| `DELETE` | `/api/alertmanagers?id=<id>` | Remove an Alertmanager |
+| `GET` | `/api/alerts` | Fetch active alerts from all Alertmanagers |
+| `POST` | `/api/silences` | Create a silence (`{alertManagerId, silence}`) |
 
-## Deploy on Vercel
+## Severity Mapping
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Alerts are bucketed by their `severity` label:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| Label value | Bucket |
+|-------------|--------|
+| `critical` | Critical |
+| `error` | Error |
+| `warning` | Warning |
+| `info`, `information`, `informing` | Info |
+| anything else / missing | None |

@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "mock": "node mock/alertmanager.mjs 9093 prod",
+    "mock:staging": "node mock/alertmanager.mjs 9094 staging",
+    "mock:quiet": "node mock/alertmanager.mjs 9095 quiet",
+    "mock:all": "node mock/alertmanager.mjs 9093 prod & node mock/alertmanager.mjs 9094 staging & node mock/alertmanager.mjs 9095 quiet"
   },
   "dependencies": {
     "next": "16.2.3",

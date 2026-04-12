@@ -3,9 +3,18 @@
 import { useEffect, useState, useCallback } from 'react';
 import SeverityCard from '@/components/SeverityCard';
 import SilenceModal from '@/components/SilenceModal';
-import { AlertManagerStatus, SeverityCounts, Severity, SEVERITIES, AlertManager } from '@/types/alertmanager';
+import { AlertManagerStatus, SeverityCounts, Severity, SEVERITIES, AlertManager, Alert } from '@/types/alertmanager';
+import { getSeverity } from '@/lib/severity';
 
 const EMPTY_COUNTS: SeverityCounts = { critical: 0, error: 0, warning: 0, info: 0, none: 0 };
+
+// Flat alert enriched with its source AlertManager
+interface FlatAlert {
+  alert: Alert;
+  amName: string;
+  amId: string;
+  am: AlertManager;
+}
 
 export default function HomePage() {
   const [data, setData] = useState<AlertManagerStatus[]>([]);
@@ -13,6 +22,8 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [showSilence, setShowSilence] = useState(false);
+  const [silenceAlert, setSilenceAlert] = useState<{ am: AlertManager; alert: Alert } | null>(null);
+  const [expandedSeverity, setExpandedSeverity] = useState<Severity | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -43,8 +54,26 @@ export default function HomePage() {
     { ...EMPTY_COUNTS }
   );
 
+  // Flatten all alerts with their source AM
+  const allAlerts: FlatAlert[] = data.flatMap((item) =>
+    item.alerts.map((alert) => ({
+      alert,
+      amName: item.alertManager.name,
+      amId: item.alertManager.id,
+      am: item.alertManager,
+    }))
+  );
+
+  const filteredAlerts = expandedSeverity
+    ? allAlerts.filter((fa) => getSeverity(fa.alert) === expandedSeverity)
+    : [];
+
   const totalAlerts = SEVERITIES.reduce((sum, s) => sum + totals[s], 0);
   const reachableCount = data.filter((d) => d.reachable).length;
+
+  function toggleSeverity(s: Severity) {
+    setExpandedSeverity((prev) => (prev === s ? null : s));
+  }
 
   return (
     <div className="flex-1 p-6 space-y-6">
@@ -102,18 +131,35 @@ export default function HomePage() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-5 gap-4">
-          {SEVERITIES.map((severity) => (
-            <SeverityCard key={severity} severity={severity as Severity} count={totals[severity]} />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-5 gap-4">
+            {SEVERITIES.map((severity) => (
+              <SeverityCard
+                key={severity}
+                severity={severity as Severity}
+                count={totals[severity]}
+                active={expandedSeverity === severity}
+                onClick={() => toggleSeverity(severity as Severity)}
+              />
+            ))}
+          </div>
+
+          {/* Expanded alerts table */}
+          {expandedSeverity && (
+            <AlertsTable
+              severity={expandedSeverity}
+              alerts={filteredAlerts}
+              onSilence={(fa) => setSilenceAlert({ am: fa.am, alert: fa.alert })}
+            />
+          )}
+        </>
       )}
 
       {/* Per-AM quick status */}
       {data.length > 0 && (
         <div className="space-y-2">
           <h2 className="text-gray-300 text-sm font-semibold uppercase tracking-wider">
-            Per AlertManager
+            Par AlertManager
           </h2>
           <div className="grid grid-cols-1 gap-2">
             {data.map((am) => (
@@ -155,8 +201,105 @@ export default function HomePage() {
           onSuccess={fetchData}
         />
       )}
+
+      {silenceAlert && (
+        <SilenceModal
+          alertManagers={alertManagers}
+          preselectedAM={silenceAlert.am}
+          preselectedAlert={silenceAlert.alert}
+          onClose={() => setSilenceAlert(null)}
+          onSuccess={fetchData}
+        />
+      )}
     </div>
   );
+}
+
+// ── AlertsTable ────────────────────────────────────────────────────────────
+
+const SEVERITY_TABLE_COLORS: Record<Severity, { header: string; row: string; text: string }> = {
+  critical: { header: 'border-red-700 bg-red-950/60',    row: 'hover:bg-red-950/40',    text: 'text-red-400' },
+  error:    { header: 'border-orange-700 bg-orange-950/60', row: 'hover:bg-orange-950/40', text: 'text-orange-400' },
+  warning:  { header: 'border-yellow-700 bg-yellow-950/60', row: 'hover:bg-yellow-950/40', text: 'text-yellow-400' },
+  info:     { header: 'border-blue-700 bg-blue-950/60',   row: 'hover:bg-blue-950/40',   text: 'text-blue-400' },
+  none:     { header: 'border-gray-600 bg-gray-800/60',   row: 'hover:bg-gray-700/40',   text: 'text-gray-400' },
+};
+
+function AlertsTable({
+  severity,
+  alerts,
+  onSilence,
+}: {
+  severity: Severity;
+  alerts: FlatAlert[];
+  onSilence: (fa: FlatAlert) => void;
+}) {
+  const colors = SEVERITY_TABLE_COLORS[severity];
+
+  return (
+    <div className={`rounded-xl border overflow-hidden ${colors.header}`}>
+      <div className="px-4 py-2.5 flex items-center justify-between">
+        <span className={`text-sm font-semibold uppercase tracking-wider ${colors.text}`}>
+          {severity} — {alerts.length} alert{alerts.length !== 1 ? 's' : ''}
+        </span>
+      </div>
+      {alerts.length === 0 ? (
+        <div className="px-4 py-6 text-center text-gray-500 text-sm">No alerts</div>
+      ) : (
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="bg-gray-900/60 text-gray-400 border-t border-gray-700">
+              <th className="text-left px-4 py-2 font-medium">Alert</th>
+              <th className="text-left px-4 py-2 font-medium">AlertManager</th>
+              <th className="text-left px-4 py-2 font-medium">Instance / Job</th>
+              <th className="text-left px-4 py-2 font-medium">Summary</th>
+              <th className="text-left px-4 py-2 font-medium">Depuis</th>
+              <th className="px-4 py-2" />
+            </tr>
+          </thead>
+          <tbody>
+            {alerts.map((fa) => (
+              <tr
+                key={`${fa.amId}-${fa.alert.fingerprint}`}
+                className={`border-t border-gray-700/50 ${colors.row}`}
+              >
+                <td className="px-4 py-2 text-white font-medium">
+                  {fa.alert.labels.alertname ?? '—'}
+                </td>
+                <td className="px-4 py-2 text-gray-300">{fa.amName}</td>
+                <td className="px-4 py-2 text-gray-400">
+                  {fa.alert.labels.instance ?? fa.alert.labels.job ?? '—'}
+                </td>
+                <td className="px-4 py-2 text-gray-400 max-w-xs truncate" title={fa.alert.annotations.summary}>
+                  {fa.alert.annotations.summary ?? '—'}
+                </td>
+                <td className="px-4 py-2 text-gray-500 whitespace-nowrap">
+                  {formatAge(fa.alert.startsAt)}
+                </td>
+                <td className="px-4 py-2 text-right">
+                  <button
+                    onClick={() => onSilence(fa)}
+                    className="text-orange-400 hover:text-orange-300 border border-orange-900 hover:border-orange-700 px-2 py-0.5 rounded"
+                  >
+                    Silence
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+function formatAge(isoDate: string): string {
+  const diff = Date.now() - new Date(isoDate).getTime();
+  const m = Math.floor(diff / 60_000);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ${m % 60}m`;
+  return `${Math.floor(h / 24)}j ${h % 24}h`;
 }
 
 function SeverityBadge({ severity, count }: { severity: Severity; count: number }) {

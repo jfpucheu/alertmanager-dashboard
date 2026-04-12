@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Tailwind v4 : dark mode via classe .dark sur <html> (next-themes) */
+@custom-variant dark (&:where(.dark, .dark *));
+
 body {
   font-family: var(--font-geist-sans, Arial, Helvetica, sans-serif);
 }

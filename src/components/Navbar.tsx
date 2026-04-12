@@ -16,11 +16,11 @@ export default function Navbar() {
 
   return (
     <>
-      <nav className="bg-gray-900 border-b border-gray-700 px-6 py-3 flex items-center justify-between">
+      <nav className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-8">
           <div className="flex items-center gap-2">
-            <span className="text-red-400 text-xl">🔔</span>
-            <span className="text-white font-bold text-lg tracking-wide">AlertManager Dashboard</span>
+            <span className="text-red-500 text-xl">🔔</span>
+            <span className="text-gray-900 dark:text-white font-bold text-lg tracking-wide">AlertManager Dashboard</span>
           </div>
           <div className="flex gap-1">
             {links.map((link) => (
@@ -29,8 +29,8 @@ export default function Navbar() {
                 href={link.href}
                 className={`px-4 py-1.5 rounded text-sm font-medium transition-colors ${
                   pathname === link.href
-                    ? 'bg-gray-700 text-white'
-                    : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                    ? 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'
                 }`}
               >
                 {link.label}
@@ -40,7 +40,7 @@ export default function Navbar() {
         </div>
         <button
           onClick={() => setShowSettings(true)}
-          className="text-gray-400 hover:text-white hover:bg-gray-800 px-3 py-1.5 rounded text-sm transition-colors flex items-center gap-1.5"
+          className="text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 px-3 py-1.5 rounded text-sm transition-colors flex items-center gap-1.5"
           title="Settings"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">

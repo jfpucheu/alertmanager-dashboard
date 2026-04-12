@@ -217,7 +217,16 @@ export default function HomePage() {
 
 // ── AlertsTable ────────────────────────────────────────────────────────────
 
+const SEVERITY_BORDER: Record<Severity, { border: string; label: string }> = {
+  critical: { border: 'border-red-600',    label: 'text-red-400' },
+  error:    { border: 'border-orange-600', label: 'text-orange-400' },
+  warning:  { border: 'border-yellow-500', label: 'text-yellow-400' },
+  info:     { border: 'border-blue-500',   label: 'text-blue-400' },
+  none:     { border: 'border-gray-500',   label: 'text-gray-400' },
+};
+
 function AlertsTable({
+  severity,
   alerts,
   onSilence,
 }: {
@@ -225,8 +234,17 @@ function AlertsTable({
   alerts: FlatAlert[];
   onSilence: (fa: FlatAlert) => void;
 }) {
+  const { border, label } = SEVERITY_BORDER[severity];
   return (
-    <div className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden">
+    <div className={`bg-gray-800 border-2 ${border} rounded-xl overflow-hidden`}>
+      {/* Coloured header strip */}
+      <div className={`bg-gray-900 border-b ${border} px-4 py-2 flex items-center gap-2`}>
+        <span className={`w-2 h-2 rounded-full bg-current ${label}`} />
+        <span className={`text-xs font-semibold uppercase tracking-widest ${label}`}>
+          {severity}
+        </span>
+        <span className="text-gray-500 text-xs">— {alerts.length} alert{alerts.length !== 1 ? 's' : ''}</span>
+      </div>
       <table className="w-full text-xs">
         <thead>
           <tr className="bg-gray-900 text-gray-400">

@@ -217,16 +217,7 @@ export default function HomePage() {
 
 // ── AlertsTable ────────────────────────────────────────────────────────────
 
-const SEVERITY_TABLE_COLORS: Record<Severity, { header: string; row: string; text: string }> = {
-  critical: { header: 'border-red-700 bg-red-950/60',    row: 'hover:bg-red-950/40',    text: 'text-red-400' },
-  error:    { header: 'border-orange-700 bg-orange-950/60', row: 'hover:bg-orange-950/40', text: 'text-orange-400' },
-  warning:  { header: 'border-yellow-700 bg-yellow-950/60', row: 'hover:bg-yellow-950/40', text: 'text-yellow-400' },
-  info:     { header: 'border-blue-700 bg-blue-950/60',   row: 'hover:bg-blue-950/40',   text: 'text-blue-400' },
-  none:     { header: 'border-gray-600 bg-gray-800/60',   row: 'hover:bg-gray-700/40',   text: 'text-gray-400' },
-};
-
 function AlertsTable({
-  severity,
   alerts,
   onSilence,
 }: {
@@ -234,72 +225,46 @@ function AlertsTable({
   alerts: FlatAlert[];
   onSilence: (fa: FlatAlert) => void;
 }) {
-  const colors = SEVERITY_TABLE_COLORS[severity];
-
   return (
-    <div className={`rounded-xl border overflow-hidden ${colors.header}`}>
-      <div className="px-4 py-2.5 flex items-center justify-between">
-        <span className={`text-sm font-semibold uppercase tracking-wider ${colors.text}`}>
-          {severity} — {alerts.length} alert{alerts.length !== 1 ? 's' : ''}
-        </span>
-      </div>
-      {alerts.length === 0 ? (
-        <div className="px-4 py-6 text-center text-gray-500 text-sm">No alerts</div>
-      ) : (
-        <table className="w-full text-xs">
-          <thead>
-            <tr className="bg-gray-900/60 text-gray-400 border-t border-gray-700">
-              <th className="text-left px-4 py-2 font-medium">Alert</th>
-              <th className="text-left px-4 py-2 font-medium">AlertManager</th>
-              <th className="text-left px-4 py-2 font-medium">Instance / Job</th>
-              <th className="text-left px-4 py-2 font-medium">Summary</th>
-              <th className="text-left px-4 py-2 font-medium">Depuis</th>
-              <th className="px-4 py-2" />
+    <div className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden">
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="bg-gray-900 text-gray-400">
+            <th className="text-left px-4 py-2 font-medium">Alert</th>
+            <th className="text-left px-4 py-2 font-medium">AlertManager</th>
+            <th className="text-left px-4 py-2 font-medium">Instance</th>
+            <th className="text-left px-4 py-2 font-medium">Since</th>
+            <th className="px-4 py-2" />
+          </tr>
+        </thead>
+        <tbody>
+          {alerts.map((fa) => (
+            <tr
+              key={`${fa.amId}-${fa.alert.fingerprint}`}
+              className="border-t border-gray-700/50 hover:bg-gray-700/30"
+            >
+              <td className="px-4 py-2 text-white">{fa.alert.labels.alertname ?? '—'}</td>
+              <td className="px-4 py-2 text-gray-400">{fa.amName}</td>
+              <td className="px-4 py-2 text-gray-400">
+                {fa.alert.labels.instance ?? fa.alert.labels.job ?? '—'}
+              </td>
+              <td className="px-4 py-2 text-gray-500">
+                {new Date(fa.alert.startsAt).toLocaleString()}
+              </td>
+              <td className="px-4 py-2 text-right">
+                <button
+                  onClick={() => onSilence(fa)}
+                  className="text-orange-400 hover:text-orange-300 text-xs border border-orange-900 hover:border-orange-700 px-2 py-0.5 rounded"
+                >
+                  Silence
+                </button>
+              </td>
             </tr>
-          </thead>
-          <tbody>
-            {alerts.map((fa) => (
-              <tr
-                key={`${fa.amId}-${fa.alert.fingerprint}`}
-                className={`border-t border-gray-700/50 ${colors.row}`}
-              >
-                <td className="px-4 py-2 text-white font-medium">
-                  {fa.alert.labels.alertname ?? '—'}
-                </td>
-                <td className="px-4 py-2 text-gray-300">{fa.amName}</td>
-                <td className="px-4 py-2 text-gray-400">
-                  {fa.alert.labels.instance ?? fa.alert.labels.job ?? '—'}
-                </td>
-                <td className="px-4 py-2 text-gray-400 max-w-xs truncate" title={fa.alert.annotations.summary}>
-                  {fa.alert.annotations.summary ?? '—'}
-                </td>
-                <td className="px-4 py-2 text-gray-500 whitespace-nowrap">
-                  {formatAge(fa.alert.startsAt)}
-                </td>
-                <td className="px-4 py-2 text-right">
-                  <button
-                    onClick={() => onSilence(fa)}
-                    className="text-orange-400 hover:text-orange-300 border border-orange-900 hover:border-orange-700 px-2 py-0.5 rounded"
-                  >
-                    Silence
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+          ))}
+        </tbody>
+      </table>
     </div>
   );
-}
-
-function formatAge(isoDate: string): string {
-  const diff = Date.now() - new Date(isoDate).getTime();
-  const m = Math.floor(diff / 60_000);
-  if (m < 60) return `${m}m`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ${m % 60}m`;
-  return `${Math.floor(h / 24)}j ${h % 24}h`;
 }
 
 function SeverityBadge({ severity, count }: { severity: Severity; count: number }) {

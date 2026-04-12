@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAlertManagers } from '@/lib/store';
+import { getAlertManagers, getConfig, resolveProxy } from '@/lib/store';
 import { createSilence } from '@/lib/alertmanager';
 import { SilencePayload } from '@/types/alertmanager';
 
@@ -20,8 +20,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'AlertManager not found' }, { status: 404 });
   }
 
+  const config = getConfig();
+  const proxy = resolveProxy(am, config);
+
   try {
-    const result = await createSilence(am.url, silence);
+    const result = await createSilence(am.url, silence, proxy);
     return NextResponse.json(result);
   } catch (err) {
     return NextResponse.json(

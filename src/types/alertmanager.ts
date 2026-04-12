@@ -7,6 +7,15 @@ export interface AlertManager {
   name: string;
   url: string;
   createdAt: string;
+  /** Custom proxy for this AlertManager. Overrides the global proxy. */
+  proxy?: string;
+  /** If true, bypass the global proxy for this AlertManager. */
+  noProxy?: boolean;
+}
+
+export interface GlobalConfig {
+  /** Global proxy URL applied to all AlertManagers unless overridden. */
+  proxy?: string;
 }
 
 export interface AlertLabel {

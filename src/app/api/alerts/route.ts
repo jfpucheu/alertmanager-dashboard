@@ -1,15 +1,17 @@
 import { NextResponse } from 'next/server';
-import { getAlertManagers } from '@/lib/store';
+import { getAlertManagers, getConfig, resolveProxy } from '@/lib/store';
 import { fetchAlerts, countBySeverity } from '@/lib/alertmanager';
 import { AlertManagerStatus } from '@/types/alertmanager';
 
 export async function GET() {
   const alertManagers = getAlertManagers();
+  const config = getConfig();
 
   const results: AlertManagerStatus[] = await Promise.all(
     alertManagers.map(async (am) => {
+      const proxy = resolveProxy(am, config);
       try {
-        const alerts = await fetchAlerts(am.url);
+        const alerts = await fetchAlerts(am.url, proxy);
         return {
           alertManager: am,
           alerts,

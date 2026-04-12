@@ -5,6 +5,24 @@ import AddAlertManagerModal from '@/components/AddAlertManagerModal';
 import SilenceModal from '@/components/SilenceModal';
 import { AlertManagerStatus, AlertManager, Alert, Severity, SEVERITIES } from '@/types/alertmanager';
 
+function ProxyBadge({ am }: { am: AlertManager }) {
+  if (am.noProxy) {
+    return (
+      <span className="text-xs bg-gray-700 text-gray-400 px-1.5 py-0.5 rounded" title="No proxy — direct connection">
+        no proxy
+      </span>
+    );
+  }
+  if (am.proxy) {
+    return (
+      <span className="text-xs bg-purple-900 text-purple-300 px-1.5 py-0.5 rounded" title={`Custom proxy: ${am.proxy}`}>
+        proxy: {new URL(am.proxy).host}
+      </span>
+    );
+  }
+  return null;
+}
+
 export default function AlertManagersPage() {
   const [data, setData] = useState<AlertManagerStatus[]>([]);
   const [alertManagers, setAlertManagers] = useState<AlertManager[]>([]);
@@ -99,6 +117,7 @@ export default function AlertManagersPage() {
                         Unreachable
                       </span>
                     )}
+                    <ProxyBadge am={item.alertManager} />
                   </div>
                   <span className="text-gray-400 text-xs truncate block">{item.alertManager.url}</span>
                 </div>

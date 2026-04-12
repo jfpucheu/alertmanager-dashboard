@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 
+type ProxyMode = 'global' | 'custom' | 'none';
+
 interface AddAlertManagerModalProps {
   onClose: () => void;
   onAdded: () => void;
@@ -10,19 +12,27 @@ interface AddAlertManagerModalProps {
 export default function AddAlertManagerModal({ onClose, onAdded }: AddAlertManagerModalProps) {
   const [name, setName] = useState('');
   const [url, setUrl] = useState('');
+  const [proxyMode, setProxyMode] = useState<ProxyMode>('global');
+  const [customProxy, setCustomProxy] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim() || !url.trim()) { setError('Name and URL are required'); return; }
+    if (proxyMode === 'custom' && !customProxy.trim()) { setError('Proxy URL is required'); return; }
     setLoading(true);
     setError('');
     try {
       const res = await fetch('/api/alertmanagers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), url: url.trim() }),
+        body: JSON.stringify({
+          name: name.trim(),
+          url: url.trim(),
+          proxy: proxyMode === 'custom' ? customProxy.trim() : undefined,
+          noProxy: proxyMode === 'none',
+        }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -64,6 +74,43 @@ export default function AddAlertManagerModal({ onClose, onAdded }: AddAlertManag
               className="w-full bg-gray-800 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm"
             />
           </div>
+
+          {/* Proxy */}
+          <div>
+            <label className="block text-gray-400 text-sm mb-2">Proxy</label>
+            <div className="flex gap-2 mb-2">
+              {(['global', 'custom', 'none'] as ProxyMode[]).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setProxyMode(mode)}
+                  className={`flex-1 py-1.5 text-xs font-medium rounded border transition-colors ${
+                    proxyMode === mode
+                      ? 'bg-blue-600 border-blue-500 text-white'
+                      : 'bg-gray-800 border-gray-600 text-gray-400 hover:text-white'
+                  }`}
+                >
+                  {mode === 'global' ? 'Use global' : mode === 'custom' ? 'Custom' : 'No proxy'}
+                </button>
+              ))}
+            </div>
+            {proxyMode === 'global' && (
+              <p className="text-gray-500 text-xs">Uses the proxy configured in Settings (if any).</p>
+            )}
+            {proxyMode === 'none' && (
+              <p className="text-gray-500 text-xs">Direct connection, ignores the global proxy.</p>
+            )}
+            {proxyMode === 'custom' && (
+              <input
+                value={customProxy}
+                onChange={(e) => setCustomProxy(e.target.value)}
+                placeholder="http://proxy-host:3128"
+                type="url"
+                className="w-full bg-gray-800 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm"
+              />
+            )}
+          </div>
+
           {error && <p className="text-red-400 text-sm">{error}</p>}
           <div className="flex justify-end gap-3 pt-1">
             <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-400 hover:text-white border border-gray-600 rounded-lg">

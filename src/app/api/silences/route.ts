@@ -9,8 +9,7 @@ export async function GET() {
     alertManagers.map(async (am) => {
       const proxy = resolveProxy(am, config);
       try {
-        const all = await fetchSilences(am.url, proxy, am.insecure);
-        const silences = all.filter((s) => s.status.state === 'active');
+        const silences = await fetchSilences(am.url, proxy, am.insecure);
         return { alertManager: am, silences, reachable: true };
       } catch (err) {
         return { alertManager: am, silences: [], reachable: false, error: err instanceof Error ? err.message : 'Unknown error' };

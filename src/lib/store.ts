@@ -71,6 +71,29 @@ export async function addAlertManager(data: {
   return newAM;
 }
 
+export async function updateAlertManager(id: string, data: {
+  name: string;
+  url: string;
+  proxy?: string;
+  noProxy?: boolean;
+  insecure?: boolean;
+}): Promise<AlertManager | null> {
+  const list = await getAlertManagers();
+  const idx = list.findIndex((am) => am.id === id);
+  if (idx === -1) return null;
+  const updated: AlertManager = {
+    ...list[idx],
+    name: data.name,
+    url: data.url.replace(/\/$/, ''),
+    proxy: data.proxy || undefined,
+    noProxy: data.noProxy || undefined,
+    insecure: data.insecure || undefined,
+  };
+  list[idx] = updated;
+  await writeKey('alertmanagers', list);
+  return updated;
+}
+
 export async function removeAlertManager(id: string): Promise<boolean> {
   const list = await getAlertManagers();
   const filtered = list.filter((am) => am.id !== id);

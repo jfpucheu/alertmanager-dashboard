@@ -1,20 +1,32 @@
 'use client';
 
 import { useState } from 'react';
+import { AlertManager } from '@/types/alertmanager';
 
 type ProxyMode = 'global' | 'custom' | 'none';
 
-interface AddAlertManagerModalProps {
-  onClose: () => void;
-  onAdded: () => void;
+function initialProxyMode(am?: AlertManager): ProxyMode {
+  if (!am) return 'global';
+  if (am.noProxy) return 'none';
+  if (am.proxy) return 'custom';
+  return 'global';
 }
 
-export default function AddAlertManagerModal({ onClose, onAdded }: AddAlertManagerModalProps) {
-  const [name, setName] = useState('');
-  const [url, setUrl] = useState('');
-  const [proxyMode, setProxyMode] = useState<ProxyMode>('global');
-  const [customProxy, setCustomProxy] = useState('');
-  const [insecure, setInsecure] = useState(false);
+interface Props {
+  onClose: () => void;
+  onSaved: () => void;
+  /** Pass an existing AlertManager to enter edit mode */
+  existing?: AlertManager;
+}
+
+export default function AddAlertManagerModal({ onClose, onSaved, existing }: Props) {
+  const isEdit = !!existing;
+
+  const [name, setName] = useState(existing?.name ?? '');
+  const [url, setUrl] = useState(existing?.url ?? '');
+  const [proxyMode, setProxyMode] = useState<ProxyMode>(initialProxyMode(existing));
+  const [customProxy, setCustomProxy] = useState(existing?.proxy ?? '');
+  const [insecure, setInsecure] = useState(existing?.insecure ?? false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -25,22 +37,26 @@ export default function AddAlertManagerModal({ onClose, onAdded }: AddAlertManag
     setLoading(true);
     setError('');
     try {
-      const res = await fetch('/api/alertmanagers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: name.trim(),
-          url: url.trim(),
-          proxy: proxyMode === 'custom' ? customProxy.trim() : undefined,
-          noProxy: proxyMode === 'none',
-          insecure,
-        }),
-      });
+      const body = {
+        name: name.trim(),
+        url: url.trim(),
+        proxy: proxyMode === 'custom' ? customProxy.trim() : undefined,
+        noProxy: proxyMode === 'none',
+        insecure,
+      };
+      const res = await fetch(
+        isEdit ? `/api/alertmanagers?id=${existing!.id}` : '/api/alertmanagers',
+        {
+          method: isEdit ? 'PATCH' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        }
+      );
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error ?? 'Failed to add');
+        throw new Error(data.error ?? 'Failed');
       }
-      onAdded();
+      onSaved();
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error');
@@ -55,7 +71,9 @@ export default function AddAlertManagerModal({ onClose, onAdded }: AddAlertManag
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
       <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl w-full max-w-md">
         <div className="flex justify-between items-center p-5 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-gray-900 dark:text-white font-semibold text-lg">Add AlertManager</h2>
+          <h2 className="text-gray-900 dark:text-white font-semibold text-lg">
+            {isEdit ? 'Modifier AlertManager' : 'Add AlertManager'}
+          </h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-700 dark:hover:text-white text-xl">✕</button>
         </div>
         <form onSubmit={handleSubmit} className="p-5 flex flex-col gap-4">
@@ -99,7 +117,7 @@ export default function AddAlertManagerModal({ onClose, onAdded }: AddAlertManag
           </div>
 
           {/* TLS */}
-          <label className="flex items-center gap-3 cursor-pointer group">
+          <label className="flex items-center gap-3 cursor-pointer">
             <div
               onClick={() => setInsecure((v) => !v)}
               className={`relative w-9 h-5 rounded-full border-2 border-transparent transition-colors shrink-0 ${insecure ? 'bg-amber-500' : 'bg-gray-300 dark:bg-gray-600'}`}
@@ -115,10 +133,10 @@ export default function AddAlertManagerModal({ onClose, onAdded }: AddAlertManag
           {error && <p className="text-red-500 text-sm">{error}</p>}
           <div className="flex justify-end gap-3 pt-1">
             <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white border border-gray-300 dark:border-gray-600 rounded-lg">
-              Cancel
+              Annuler
             </button>
             <button type="submit" disabled={loading} className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-500 text-white rounded-lg disabled:opacity-50">
-              {loading ? 'Adding...' : 'Add AlertManager'}
+              {loading ? '…' : isEdit ? 'Enregistrer' : 'Add AlertManager'}
             </button>
           </div>
         </form>

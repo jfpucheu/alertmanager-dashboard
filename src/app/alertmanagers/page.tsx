@@ -30,6 +30,7 @@ export default function AlertManagersPage() {
   const [alertManagers, setAlertManagers] = useState<AlertManager[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
+  const [editingAM, setEditingAM] = useState<AlertManager | null>(null);
   const [silenceContext, setSilenceContext] = useState<{
     am?: AlertManager;
     alert?: Alert;
@@ -145,6 +146,9 @@ export default function AlertManagersPage() {
                   <button onClick={() => setSilenceContext({ am: item.alertManager })} className="text-xs text-orange-500 hover:text-orange-400 border border-orange-300 dark:border-orange-800 hover:border-orange-400 dark:hover:border-orange-600 px-2 py-1 rounded">
                     Silence
                   </button>
+                  <button onClick={() => setEditingAM(item.alertManager)} className="text-xs text-blue-500 hover:text-blue-400 border border-blue-200 dark:border-blue-900 hover:border-blue-400 dark:hover:border-blue-700 px-2 py-1 rounded">
+                    Edit
+                  </button>
                   <button onClick={() => handleDelete(item.alertManager.id)} className="text-xs text-red-500 hover:text-red-400 border border-red-200 dark:border-red-900 hover:border-red-400 dark:hover:border-red-700 px-2 py-1 rounded">
                     Remove
                   </button>
@@ -193,7 +197,8 @@ export default function AlertManagersPage() {
         ))}
       </div>
 
-      {showAdd && <AddAlertManagerModal onClose={() => setShowAdd(false)} onAdded={fetchData} />}
+      {showAdd && <AddAlertManagerModal onClose={() => setShowAdd(false)} onSaved={fetchData} />}
+      {editingAM && <AddAlertManagerModal existing={editingAM} onClose={() => setEditingAM(null)} onSaved={fetchData} />}
       {silenceContext !== null && (
         <SilenceModal
           alertManagers={alertManagers}

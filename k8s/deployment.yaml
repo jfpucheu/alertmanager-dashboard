@@ -28,6 +28,17 @@ spec:
               value: "alertmanager-dashboard"
             - name: NODE_ENV
               value: "production"
+            # Set to "true" to enforce LDAP login (requires LDAP config in Settings)
+            - name: LDAP_ENABLED
+              value: "false"
+            # Generate with: openssl rand -base64 32
+            - name: NEXTAUTH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: alertmanager-dashboard-auth
+                  key: secret
+            - name: NEXTAUTH_URL
+              value: "https://your-dashboard-url"
           resources:
             requests:
               cpu: 50m

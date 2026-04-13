@@ -25,6 +25,7 @@ export default function HomePage() {
   const [silenceAlert, setSilenceAlert] = useState<{ am: AlertManager; alert: Alert } | null>(null);
   const [expandedSeverities, setExpandedSeverities] = useState<Set<Severity>>(new Set());
   const [assignments, setAssignments] = useState<AssignmentMap>({});
+  const [selectedAmId, setSelectedAmId] = useState<string>('');
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -45,12 +46,14 @@ export default function HomePage() {
     return () => clearInterval(interval);
   }, [fetchData]);
 
-  const totals = data.reduce<SeverityCounts>(
+  const filteredData = selectedAmId ? data.filter((d) => d.alertManager.id === selectedAmId) : data;
+
+  const totals = filteredData.reduce<SeverityCounts>(
     (acc, am) => { for (const s of SEVERITIES) acc[s] += am.severityCounts[s]; return acc; },
     { ...EMPTY_COUNTS }
   );
 
-  const allAlerts: FlatAlert[] = data.flatMap((item) =>
+  const allAlerts: FlatAlert[] = filteredData.flatMap((item) =>
     item.alerts.map((alert) => ({ alert, amName: item.alertManager.name, amId: item.alertManager.id, am: item.alertManager }))
   );
 
@@ -80,7 +83,21 @@ export default function HomePage() {
             )}
           </p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex items-center gap-3">
+          {data.length > 1 && (
+            <select
+              value={selectedAmId}
+              onChange={(e) => setSelectedAmId(e.target.value)}
+              className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Tous les AlertManagers</option>
+              {data.map((d) => (
+                <option key={d.alertManager.id} value={d.alertManager.id}>
+                  {d.alertManager.name}
+                </option>
+              ))}
+            </select>
+          )}
           <button onClick={() => setShowSilence(true)} className="px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white text-sm font-medium rounded-lg">
             + Create Silence
           </button>
@@ -96,7 +113,9 @@ export default function HomePage() {
           <span className="text-gray-500 dark:text-gray-400 text-sm">Total active alerts:</span>
           <span className="text-gray-900 dark:text-white text-2xl font-bold">{totalAlerts}</span>
           <span className="text-gray-400 dark:text-gray-500 text-sm">
-            across {data.length} AlertManager{data.length > 1 ? 's' : ''}
+            {selectedAmId
+              ? `sur ${data.find((d) => d.alertManager.id === selectedAmId)?.alertManager.name}`
+              : `sur ${data.length} AlertManager${data.length > 1 ? 's' : ''}`}
           </span>
         </div>
       )}

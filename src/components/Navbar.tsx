@@ -2,12 +2,28 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import SettingsModal from '@/components/SettingsModal';
+import { GlobalConfig } from '@/types/alertmanager';
+
+const DEFAULT_TITLE = 'AlertManager Dashboard';
+const DEFAULT_LOGO = '🔔';
 
 export default function Navbar() {
   const pathname = usePathname();
   const [showSettings, setShowSettings] = useState(false);
+  const [title, setTitle] = useState(DEFAULT_TITLE);
+  const [logoUrl, setLogoUrl] = useState('');
+
+  useEffect(() => {
+    fetch('/api/config')
+      .then((r) => r.json())
+      .then((config: GlobalConfig) => {
+        if (config.title) setTitle(config.title);
+        if (config.logoUrl) setLogoUrl(config.logoUrl);
+      })
+      .catch(() => {});
+  }, []);
 
   const links = [
     { href: '/', label: 'Overview' },
@@ -19,8 +35,13 @@ export default function Navbar() {
       <nav className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-8">
           <div className="flex items-center gap-2">
-            <span className="text-red-500 text-xl">🔔</span>
-            <span className="text-gray-900 dark:text-white font-bold text-lg tracking-wide">AlertManager Dashboard</span>
+            {logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={logoUrl} alt="logo" className="w-7 h-7 object-contain rounded" />
+            ) : (
+              <span className="text-red-500 text-xl">{DEFAULT_LOGO}</span>
+            )}
+            <span className="text-gray-900 dark:text-white font-bold text-lg tracking-wide">{title}</span>
           </div>
           <div className="flex gap-1">
             {links.map((link) => (
@@ -50,7 +71,12 @@ export default function Navbar() {
         </button>
       </nav>
 
-      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
+      {showSettings && (
+        <SettingsModal
+          onClose={() => setShowSettings(false)}
+          onBrandingChanged={(t, l) => { setTitle(t || DEFAULT_TITLE); setLogoUrl(l || ''); }}
+        />
+      )}
     </>
   );
 }

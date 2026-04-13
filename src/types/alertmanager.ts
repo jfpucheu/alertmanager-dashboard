@@ -13,9 +13,21 @@ export interface AlertManager {
   noProxy?: boolean;
 }
 
+export interface LdapConfig {
+  enabled: boolean;
+  url: string;              // ldap://host:389 or ldaps://host:636
+  bindDN: string;           // CN=svc,DC=example,DC=com
+  bindPassword: string;
+  searchBase: string;       // DC=example,DC=com
+  searchFilter: string;     // (uid={{username}})
+  displayNameAttr: string;  // cn or displayName
+}
+
 export interface GlobalConfig {
-  /** Global proxy URL applied to all AlertManagers unless overridden. */
   proxy?: string;
+  ldap?: LdapConfig;
+  title?: string;
+  logoUrl?: string;
 }
 
 export interface AlertLabel {

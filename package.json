@@ -13,7 +13,9 @@
     "mock:all": "node mock/alertmanager.mjs 9093 prod & node mock/alertmanager.mjs 9094 staging & node mock/alertmanager.mjs 9095 quiet"
   },
   "dependencies": {
+    "ldapts": "^8.1.7",
     "next": "16.2.3",
+    "next-auth": "^4.24.13",
     "next-themes": "^0.4.6",
     "react": "19.2.4",
     "react-dom": "19.2.4",

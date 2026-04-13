@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useSession } from 'next-auth/react';
 import { Assignment } from '@/types/alertmanager';
 
 const LS_KEY = 'am-dashboard-username';
@@ -13,23 +14,26 @@ interface AssignCellProps {
 }
 
 export default function AssignCell({ amId, fingerprint, assignment, onChanged }: AssignCellProps) {
+  const { data: session } = useSession();
+  const sessionUsername = (session?.user as { username?: string })?.username ?? session?.user?.name ?? null;
+
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Pre-fill with last used name from localStorage
+  // Pre-fill with session username > localStorage fallback
   useEffect(() => {
     if (editing) {
-      const saved = localStorage.getItem(LS_KEY) ?? '';
+      const saved = sessionUsername ?? localStorage.getItem(LS_KEY) ?? '';
       setName(saved);
       setTimeout(() => inputRef.current?.focus(), 0);
     }
-  }, [editing]);
+  }, [editing, sessionUsername]);
 
   async function handleAssign(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
-    localStorage.setItem(LS_KEY, name.trim());
+    if (!sessionUsername) localStorage.setItem(LS_KEY, name.trim());
     await fetch('/api/assignments', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -78,9 +82,19 @@ export default function AssignCell({ amId, fingerprint, assignment, onChanged }:
     );
   }
 
+  async function handleQuickAssign() {
+    if (!sessionUsername) { setEditing(true); return; }
+    await fetch('/api/assignments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amId, fingerprint, name: sessionUsername }),
+    });
+    onChanged();
+  }
+
   return (
     <button
-      onClick={() => setEditing(true)}
+      onClick={handleQuickAssign}
       className="text-xs text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 border border-dashed border-gray-300 dark:border-gray-600 hover:border-blue-400 dark:hover:border-blue-500 px-2 py-0.5 rounded transition-colors"
     >
       + Affecter

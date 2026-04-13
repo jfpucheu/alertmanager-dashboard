@@ -203,7 +203,7 @@ function json(res, status, body) {
   res.writeHead(status, {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
   });
   res.end(JSON.stringify(body, null, 2));
@@ -225,7 +225,7 @@ const server = http.createServer(async (req, res) => {
 
   // CORS preflight
   if (req.method === 'OPTIONS') {
-    res.writeHead(204, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' });
+    res.writeHead(204, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' });
     res.end();
     return;
   }
@@ -257,6 +257,16 @@ const server = http.createServer(async (req, res) => {
     return json(res, 200, { silenceID: id });
   }
 
+  // DELETE /api/v2/silence/:id
+  if (req.method === 'DELETE' && path.startsWith('/api/v2/silence/')) {
+    const id = path.split('/').pop();
+    const idx = silences.findIndex((s) => s.id === id);
+    if (idx === -1) return json(res, 404, { error: `Silence ${id} not found` });
+    silences[idx] = { ...silences[idx], status: { state: 'expired' } };
+    console.log(`  → Expired silence ${id}`);
+    return json(res, 200, {});
+  }
+
   // GET /api/v2/status (bonus — for health checks)
   if (req.method === 'GET' && path === '/api/v2/status') {
     return json(res, 200, {
@@ -284,6 +294,8 @@ server.listen(PORT, () => {
   );
   console.log(`\n🔔 Mock Alertmanager (${PRESET}) listening on http://localhost:${PORT}`);
   console.log(`   Alerts: ${alerts.length} total —`, Object.entries(counts).map(([k,v]) => `${k}:${v}`).join('  '));
-  console.log(`   GET  /api/v2/alerts`);
-  console.log(`   POST /api/v2/silences\n`);
+  console.log(`   GET    /api/v2/alerts`);
+  console.log(`   GET    /api/v2/silences`);
+  console.log(`   POST   /api/v2/silences`);
+  console.log(`   DELETE /api/v2/silence/:id\n`);
 });

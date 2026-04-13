@@ -7,16 +7,18 @@ interface SilenceModalProps {
   alertManagers: AlertManager[];
   preselectedAM?: AlertManager;
   preselectedAlert?: Alert;
+  preselectedMatchers?: SilenceMatcher[];
   onClose: () => void;
   onSuccess: () => void;
 }
 
-export default function SilenceModal({ alertManagers, preselectedAM, preselectedAlert, onClose, onSuccess }: SilenceModalProps) {
+export default function SilenceModal({ alertManagers, preselectedAM, preselectedAlert, preselectedMatchers, onClose, onSuccess }: SilenceModalProps) {
   const [selectedAMId, setSelectedAMId] = useState(preselectedAM?.id ?? '');
   const [matchers, setMatchers] = useState<SilenceMatcher[]>(
-    preselectedAlert
+    preselectedMatchers ??
+    (preselectedAlert
       ? Object.entries(preselectedAlert.labels).map(([name, value]) => ({ name, value, isRegex: false, isEqual: true }))
-      : [{ name: '', value: '', isRegex: false, isEqual: true }]
+      : [{ name: '', value: '', isRegex: false, isEqual: true }])
   );
   const [duration, setDuration] = useState('2h');
   const [comment, setComment] = useState('');

@@ -20,7 +20,11 @@ export default function AlertManagersPage() {
   const [alertManagers, setAlertManagers] = useState<AlertManager[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
-  const [silenceContext, setSilenceContext] = useState<{ am?: AlertManager; alert?: Alert } | null>(null);
+  const [silenceContext, setSilenceContext] = useState<{
+    am?: AlertManager;
+    alert?: Alert;
+    silenceAll?: boolean;
+  } | null>(null);
   const [expandedAM, setExpandedAM] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
@@ -107,6 +111,11 @@ export default function AlertManagersPage() {
                       {expandedAM === item.alertManager.id ? 'Hide alerts' : `View ${item.alerts.length} alert${item.alerts.length > 1 ? 's' : ''}`}
                     </button>
                   )}
+                  {item.reachable && item.alerts.length > 0 && (
+                    <button onClick={() => setSilenceContext({ am: item.alertManager, silenceAll: true })} className="text-xs text-orange-500 hover:text-orange-400 border border-orange-300 dark:border-orange-800 hover:border-orange-400 dark:hover:border-orange-600 px-2 py-1 rounded">
+                      Silence all
+                    </button>
+                  )}
                   <button onClick={() => setSilenceContext({ am: item.alertManager })} className="text-xs text-orange-500 hover:text-orange-400 border border-orange-300 dark:border-orange-800 hover:border-orange-400 dark:hover:border-orange-600 px-2 py-1 rounded">
                     Silence
                   </button>
@@ -143,7 +152,17 @@ export default function AlertManagersPage() {
 
       {showAdd && <AddAlertManagerModal onClose={() => setShowAdd(false)} onAdded={fetchData} />}
       {silenceContext !== null && (
-        <SilenceModal alertManagers={alertManagers} preselectedAM={silenceContext.am} preselectedAlert={silenceContext.alert} onClose={() => setSilenceContext(null)} onSuccess={fetchData} />
+        <SilenceModal
+          alertManagers={alertManagers}
+          preselectedAM={silenceContext.am}
+          preselectedAlert={silenceContext.alert}
+          preselectedMatchers={silenceContext.silenceAll
+            ? [{ name: 'alertname', value: '.*', isRegex: true, isEqual: true }]
+            : undefined
+          }
+          onClose={() => setSilenceContext(null)}
+          onSuccess={fetchData}
+        />
       )}
     </div>
   );

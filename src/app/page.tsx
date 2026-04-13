@@ -22,7 +22,7 @@ export default function HomePage() {
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [showSilence, setShowSilence] = useState(false);
   const [silenceAlert, setSilenceAlert] = useState<{ am: AlertManager; alert: Alert } | null>(null);
-  const [expandedSeverity, setExpandedSeverity] = useState<Severity | null>(null);
+  const [expandedSeverities, setExpandedSeverities] = useState<Set<Severity>>(new Set());
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -51,12 +51,15 @@ export default function HomePage() {
     item.alerts.map((alert) => ({ alert, amName: item.alertManager.name, amId: item.alertManager.id, am: item.alertManager }))
   );
 
-  const filteredAlerts = expandedSeverity ? allAlerts.filter((fa) => getSeverity(fa.alert) === expandedSeverity) : [];
   const totalAlerts = SEVERITIES.reduce((sum, s) => sum + totals[s], 0);
   const reachableCount = data.filter((d) => d.reachable).length;
 
   function toggleSeverity(s: Severity) {
-    setExpandedSeverity((prev) => (prev === s ? null : s));
+    setExpandedSeverities((prev) => {
+      const next = new Set(prev);
+      next.has(s) ? next.delete(s) : next.add(s);
+      return next;
+    });
   }
 
   return (
@@ -113,19 +116,20 @@ export default function HomePage() {
                 key={severity}
                 severity={severity as Severity}
                 count={totals[severity]}
-                active={expandedSeverity === severity}
+                active={expandedSeverities.has(severity as Severity)}
                 onClick={() => toggleSeverity(severity as Severity)}
               />
             ))}
           </div>
 
-          {expandedSeverity && (
+          {SEVERITIES.filter((s) => expandedSeverities.has(s as Severity)).map((severity) => (
             <AlertsTable
-              severity={expandedSeverity}
-              alerts={filteredAlerts}
+              key={severity}
+              severity={severity as Severity}
+              alerts={allAlerts.filter((fa) => getSeverity(fa.alert) === severity)}
               onSilence={(fa) => setSilenceAlert({ am: fa.am, alert: fa.alert })}
             />
-          )}
+          ))}
         </>
       )}
 

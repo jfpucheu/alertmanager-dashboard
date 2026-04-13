@@ -178,7 +178,7 @@ export default function AlertManagersPage() {
           preselectedAM={silenceContext.am}
           preselectedAlert={silenceContext.alert}
           preselectedMatchers={silenceContext.silenceAll
-            ? [{ name: 'alertname', value: '.*', isRegex: true, isEqual: true }]
+            ? [{ name: 'alertname', value: '.+', isRegex: true, isEqual: true }]
             : undefined
           }
           onClose={() => setSilenceContext(null)}

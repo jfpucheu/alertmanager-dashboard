@@ -54,6 +54,7 @@ export async function addAlertManager(data: {
   url: string;
   proxy?: string;
   noProxy?: boolean;
+  insecure?: boolean;
 }): Promise<AlertManager> {
   const list = await getAlertManagers();
   const newAM: AlertManager = {
@@ -63,6 +64,7 @@ export async function addAlertManager(data: {
     createdAt: new Date().toISOString(),
     ...(data.proxy ? { proxy: data.proxy } : {}),
     ...(data.noProxy ? { noProxy: true } : {}),
+    ...(data.insecure ? { insecure: true } : {}),
   };
   list.push(newAM);
   await writeKey('alertmanagers', list);

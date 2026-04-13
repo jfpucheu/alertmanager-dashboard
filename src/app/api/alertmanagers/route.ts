@@ -7,7 +7,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { name, url, proxy, noProxy } = body;
+  const { name, url, proxy, noProxy, insecure } = body;
   if (!name || !url) {
     return NextResponse.json({ error: 'name and url are required' }, { status: 400 });
   }
@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid proxy URL format' }, { status: 400 });
     }
   }
-  const am = await addAlertManager({ name, url, proxy: proxy || undefined, noProxy: !!noProxy });
+  const am = await addAlertManager({ name, url, proxy: proxy || undefined, noProxy: !!noProxy, insecure: !!insecure });
   return NextResponse.json(am, { status: 201 });
 }
 

@@ -16,6 +16,15 @@ function ProxyBadge({ am }: { am: AlertManager }) {
   return null;
 }
 
+function InsecureBadge({ am }: { am: AlertManager }) {
+  if (!am.insecure) return null;
+  return (
+    <span className="text-xs bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded" title="TLS certificate errors ignored">
+      TLS non vérifié
+    </span>
+  );
+}
+
 export default function AlertManagersPage() {
   const [data, setData] = useState<AlertManagerStatus[]>([]);
   const [alertManagers, setAlertManagers] = useState<AlertManager[]>([]);
@@ -90,6 +99,7 @@ export default function AlertManagersPage() {
                       <span className="text-xs bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300 px-2 py-0.5 rounded">Unreachable</span>
                     )}
                     <ProxyBadge am={item.alertManager} />
+                    <InsecureBadge am={item.alertManager} />
                   </div>
                   <a href={item.alertManager.url} target="_blank" rel="noopener noreferrer" className="text-gray-400 dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 text-xs truncate block hover:underline">
                     {item.alertManager.url}

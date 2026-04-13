@@ -10,7 +10,7 @@ export async function GET() {
     alertManagers.map(async (am) => {
       const proxy = resolveProxy(am, config);
       try {
-        const alerts = await fetchAlerts(am.url, proxy);
+        const alerts = await fetchAlerts(am.url, proxy, am.insecure);
         return { alertManager: am, alerts, severityCounts: countBySeverity(alerts), reachable: true };
       } catch (err) {
         return {

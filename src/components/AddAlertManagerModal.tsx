@@ -14,6 +14,7 @@ export default function AddAlertManagerModal({ onClose, onAdded }: AddAlertManag
   const [url, setUrl] = useState('');
   const [proxyMode, setProxyMode] = useState<ProxyMode>('global');
   const [customProxy, setCustomProxy] = useState('');
+  const [insecure, setInsecure] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -32,6 +33,7 @@ export default function AddAlertManagerModal({ onClose, onAdded }: AddAlertManag
           url: url.trim(),
           proxy: proxyMode === 'custom' ? customProxy.trim() : undefined,
           noProxy: proxyMode === 'none',
+          insecure,
         }),
       });
       if (!res.ok) {
@@ -95,6 +97,20 @@ export default function AddAlertManagerModal({ onClose, onAdded }: AddAlertManag
               <input value={customProxy} onChange={(e) => setCustomProxy(e.target.value)} placeholder="http://proxy-host:3128" type="url" className={inputCls} />
             )}
           </div>
+
+          {/* TLS */}
+          <label className="flex items-center gap-3 cursor-pointer group">
+            <div
+              onClick={() => setInsecure((v) => !v)}
+              className={`relative w-9 h-5 rounded-full border-2 border-transparent transition-colors shrink-0 ${insecure ? 'bg-amber-500' : 'bg-gray-300 dark:bg-gray-600'}`}
+            >
+              <span className={`absolute top-0.5 left-0.5 w-3.5 h-3.5 bg-white rounded-full shadow transform transition-transform ${insecure ? 'translate-x-4' : 'translate-x-0'}`} />
+            </div>
+            <div>
+              <span className="text-gray-700 dark:text-gray-300 text-sm font-medium">Ignorer les erreurs TLS</span>
+              <p className="text-gray-400 dark:text-gray-500 text-xs">Accepte les certificats auto-signés ou expirés.</p>
+            </div>
+          </label>
 
           {error && <p className="text-red-500 text-sm">{error}</p>}
           <div className="flex justify-end gap-3 pt-1">

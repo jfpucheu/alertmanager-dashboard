@@ -1,15 +1,21 @@
-import { ProxyAgent } from 'undici';
+import { ProxyAgent, Agent } from 'undici';
 import { Alert, SilencePayload } from '@/types/alertmanager';
 export { getSeverity, countBySeverity } from '@/lib/severity';
 
-function makeDispatcher(proxyUrl?: string): ProxyAgent | undefined {
-  if (!proxyUrl) return undefined;
-  return new ProxyAgent(proxyUrl);
+function makeDispatcher(proxyUrl?: string, insecure?: boolean): ProxyAgent | Agent | undefined {
+  const tls = insecure ? { rejectUnauthorized: false } : undefined;
+  if (proxyUrl) {
+    return new ProxyAgent({ uri: proxyUrl, ...(tls ? { connect: tls } : {}) });
+  }
+  if (tls) {
+    return new Agent({ connect: tls });
+  }
+  return undefined;
 }
 
-export async function fetchAlerts(baseUrl: string, proxyUrl?: string): Promise<Alert[]> {
+export async function fetchAlerts(baseUrl: string, proxyUrl?: string, insecure?: boolean): Promise<Alert[]> {
   const url = `${baseUrl}/api/v2/alerts?active=true&silenced=false&inhibited=false`;
-  const dispatcher = makeDispatcher(proxyUrl);
+  const dispatcher = makeDispatcher(proxyUrl, insecure);
   const res = await fetch(url, {
     headers: { Accept: 'application/json' },
     signal: AbortSignal.timeout(8000),
@@ -20,14 +26,14 @@ export async function fetchAlerts(baseUrl: string, proxyUrl?: string): Promise<A
   return res.json();
 }
 
-
 export async function createSilence(
   baseUrl: string,
   payload: SilencePayload,
-  proxyUrl?: string
+  proxyUrl?: string,
+  insecure?: boolean,
 ): Promise<{ silenceID: string }> {
   const url = `${baseUrl}/api/v2/silences`;
-  const dispatcher = makeDispatcher(proxyUrl);
+  const dispatcher = makeDispatcher(proxyUrl, insecure);
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

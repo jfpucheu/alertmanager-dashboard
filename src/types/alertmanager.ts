@@ -11,6 +11,8 @@ export interface AlertManager {
   proxy?: string;
   /** If true, bypass the global proxy for this AlertManager. */
   noProxy?: boolean;
+  /** If true, ignore TLS certificate errors (self-signed, expired…). */
+  insecure?: boolean;
 }
 
 export interface LdapConfig {

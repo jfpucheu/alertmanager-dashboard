@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
 
   const proxy = resolveProxy(am, config);
   try {
-    const result = await createSilence(am.url, silence, proxy);
+    const result = await createSilence(am.url, silence, proxy, am.insecure);
     return NextResponse.json(result);
   } catch (err) {
     return NextResponse.json(

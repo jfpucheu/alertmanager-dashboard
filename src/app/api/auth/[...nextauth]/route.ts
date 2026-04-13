@@ -1,7 +1,7 @@
 import NextAuth, { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { getConfig } from '@/lib/store';
-import { authenticateLDAP } from '@/lib/ldap';
+import { authenticateLDAP, getLdapConfig } from '@/lib/ldap';
 
 export const authOptions: NextAuthOptions = {
   session: { strategy: 'jwt' },
@@ -16,8 +16,9 @@ export const authOptions: NextAuthOptions = {
       async authorize(credentials) {
         if (!credentials?.username || !credentials?.password) return null;
         const config = await getConfig();
-        if (!config.ldap?.enabled) return null;
-        const user = await authenticateLDAP(config.ldap, credentials.username, credentials.password);
+        const ldapConfig = getLdapConfig(config.ldap);
+        if (!ldapConfig) return null;
+        const user = await authenticateLDAP(ldapConfig, credentials.username, credentials.password);
         if (!user) return null;
         return { id: user.username, name: user.displayName, email: null };
       },

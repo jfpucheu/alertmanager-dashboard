@@ -1,6 +1,41 @@
 import { Client } from 'ldapts';
 import { LdapConfig } from '@/types/alertmanager';
 
+/**
+ * Build the effective LDAP config by merging stored config with environment variables.
+ * Environment variables take priority over stored config.
+ *
+ * Env vars:
+ *   LDAP_ENABLED        — "true" to enforce authentication (also read by middleware)
+ *   LDAP_URL            — ldap://host:389 or ldaps://host:636
+ *   LDAP_BIND_DN        — service account DN
+ *   LDAP_BIND_PASSWORD  — service account password
+ *   LDAP_SEARCH_BASE    — DC=example,DC=com
+ *   LDAP_SEARCH_FILTER  — (uid={{username}})
+ *   LDAP_DISPLAY_ATTR   — attribute used as display name (default: cn)
+ *
+ * Returns null if LDAP is not enabled or if required fields are missing.
+ */
+export function getLdapConfig(stored?: LdapConfig): LdapConfig | null {
+  const envEnabled = process.env.LDAP_ENABLED === 'true';
+  const storedEnabled = stored?.enabled === true;
+
+  const merged: LdapConfig = {
+    enabled:         envEnabled || storedEnabled,
+    url:             process.env.LDAP_URL            ?? stored?.url            ?? '',
+    bindDN:          process.env.LDAP_BIND_DN        ?? stored?.bindDN        ?? '',
+    bindPassword:    process.env.LDAP_BIND_PASSWORD  ?? stored?.bindPassword  ?? '',
+    searchBase:      process.env.LDAP_SEARCH_BASE    ?? stored?.searchBase    ?? '',
+    searchFilter:    process.env.LDAP_SEARCH_FILTER  ?? stored?.searchFilter  ?? '',
+    displayNameAttr: process.env.LDAP_DISPLAY_ATTR   ?? stored?.displayNameAttr ?? 'cn',
+  };
+
+  if (!merged.enabled) return null;
+  if (!merged.url || !merged.bindDN || !merged.bindPassword || !merged.searchBase || !merged.searchFilter) return null;
+
+  return merged;
+}
+
 export interface LdapUser {
   username: string;
   displayName: string;

@@ -59,6 +59,12 @@ Copy `.env.local.example` to `.env.local` and fill in the values:
 | `NEXTAUTH_SECRET` | **Yes** | Random secret for JWT signing. Generate with `openssl rand -base64 32` |
 | `NEXTAUTH_URL` | Production | Full URL of the app, e.g. `https://dashboard.example.com` |
 | `LDAP_ENABLED` | No | Set to `true` to enforce LDAP login on all routes (default: `false`) |
+| `LDAP_URL` | No | LDAP server URL — overrides UI setting |
+| `LDAP_BIND_DN` | No | Service account DN — overrides UI setting |
+| `LDAP_BIND_PASSWORD` | No | Service account password — overrides UI setting |
+| `LDAP_SEARCH_BASE` | No | Base DN for user search — overrides UI setting |
+| `LDAP_SEARCH_FILTER` | No | Search filter (`{{username}}` placeholder) — overrides UI setting |
+| `LDAP_DISPLAY_ATTR` | No | Display name attribute (default: `cn`) — overrides UI setting |
 
 ### Storage
 
@@ -75,7 +81,16 @@ In-cluster storage is auto-detected via the `KUBERNETES_SERVICE_HOST` env variab
 
 LDAP is **optional**. When disabled, the app is accessible without login.
 
-### 1 — Configure LDAP in the UI
+LDAP settings can be configured in two ways — they can be combined (env vars take priority):
+
+| Method | Best for |
+|--------|----------|
+| **UI** (Settings → LDAP) | Quick setup, config stored in ConfigMap / JSON |
+| **Environment variables** | GitOps / Kubernetes, credentials in a Secret |
+
+### 1 — Configure LDAP
+
+**Option A — UI**
 
 Go to **Settings → Authentification LDAP**, enable the toggle, and fill in:
 
@@ -89,6 +104,19 @@ Go to **Settings → Authentification LDAP**, enable the toggle, and fill in:
 | Attribut nom affiché | Attribute used as the display name | `cn` or `displayName` |
 
 Save settings. The config is stored in the same ConfigMap / JSON as the rest of the data.
+
+**Option B — Environment variables**
+
+Set the `LDAP_*` variables (see table above). Any variable that is set overrides the corresponding UI value. The bind password can be stored in a Kubernetes Secret and injected as an env var — it never touches the ConfigMap.
+
+```bash
+LDAP_URL=ldap://ldap.example.com:389
+LDAP_BIND_DN=CN=svc-dashboard,OU=Services,DC=example,DC=com
+LDAP_BIND_PASSWORD=secret
+LDAP_SEARCH_BASE=OU=Users,DC=example,DC=com
+LDAP_SEARCH_FILTER=(sAMAccountName={{username}})
+LDAP_DISPLAY_ATTR=displayName
+```
 
 ### 2 — Enable enforcement via environment variable
 

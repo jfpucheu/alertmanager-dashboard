@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import SeverityCard from '@/components/SeverityCard';
 import SilenceModal from '@/components/SilenceModal';
-import { AlertManagerStatus, SeverityCounts, Severity, SEVERITIES, AlertManager, Alert, AssignmentMap, AMSilences, Silence } from '@/types/alertmanager';
+import { AlertManagerStatus, SeverityCounts, Severity, SEVERITIES, AlertManager, Alert, AssignmentMap } from '@/types/alertmanager';
 import { getSeverity } from '@/lib/severity';
 import AssignCell from '@/components/AssignCell';
 
@@ -27,17 +27,14 @@ export default function HomePage() {
   const [assignments, setAssignments] = useState<AssignmentMap>({});
   const [selectedAmId, setSelectedAmId] = useState<string>('');
   const [alertnameFilter, setAlertnameFilter] = useState('');
-  const [silencesData, setSilencesData] = useState<AMSilences[]>([]);
-  const [showSilencesTable, setShowSilencesTable] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [alertsRes, amsRes, assignRes, silencesRes] = await Promise.all([fetch('/api/alerts'), fetch('/api/alertmanagers'), fetch('/api/assignments'), fetch('/api/silences')]);
+      const [alertsRes, amsRes, assignRes] = await Promise.all([fetch('/api/alerts'), fetch('/api/alertmanagers'), fetch('/api/assignments')]);
       setData(await alertsRes.json());
       setAlertManagers(await amsRes.json());
       setAssignments(await assignRes.json());
-      setSilencesData(await silencesRes.json());
       setLastRefresh(new Date());
     } finally {
       setLoading(false);
@@ -62,12 +59,6 @@ export default function HomePage() {
   ).filter((fa) => !alertnameFilter || (fa.alert.labels.alertname ?? '').toLowerCase().includes(alertnameFilter.toLowerCase()));
 
   const totalAlerts = SEVERITIES.reduce((sum, s) => sum + totals[s], 0);
-
-  const filteredSilences = (selectedAmId
-    ? silencesData.filter((s) => s.alertManager.id === selectedAmId)
-    : silencesData
-  ).flatMap((s) => s.silences.map((silence) => ({ silence, amName: s.alertManager.name })));
-  const totalSilences = filteredSilences.length;
   const reachableCount = data.filter((d) => d.reachable).length;
 
   function toggleSeverity(s: Severity) {
@@ -139,9 +130,6 @@ export default function HomePage() {
               ? `sur ${data.find((d) => d.alertManager.id === selectedAmId)?.alertManager.name}`
               : `sur ${data.length} AlertManager${data.length > 1 ? 's' : ''}`}
           </span>
-          <span className="ml-4 text-gray-400 dark:text-gray-600">|</span>
-          <span className="text-gray-500 dark:text-gray-400 text-sm ml-1">Silences actifs :</span>
-          <span className="text-purple-600 dark:text-purple-400 text-2xl font-bold">{totalSilences}</span>
         </div>
       )}
 
@@ -157,7 +145,7 @@ export default function HomePage() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-6 gap-4">
+          <div className="grid grid-cols-5 gap-4">
             {SEVERITIES.map((severity) => (
               <SeverityCard
                 key={severity}
@@ -167,31 +155,7 @@ export default function HomePage() {
                 onClick={() => toggleSeverity(severity as Severity)}
               />
             ))}
-            {/* Silences card */}
-            <div
-              onClick={() => totalSilences > 0 && setShowSilencesTable((v) => !v)}
-              className={[
-                'rounded-xl border p-6 flex flex-col items-center gap-3 transition-all',
-                'bg-purple-50 dark:bg-purple-950',
-                showSilencesTable
-                  ? 'border-purple-500 dark:border-purple-400 ring-1 ring-purple-500 dark:ring-purple-400'
-                  : 'border-purple-200 dark:border-purple-700',
-                totalSilences > 0 ? 'cursor-pointer hover:brightness-95 dark:hover:brightness-110 select-none' : 'opacity-40',
-              ].join(' ')}
-            >
-              <span className="text-sm font-semibold uppercase tracking-widest text-purple-600 dark:text-purple-400">Silences</span>
-              <span className="text-5xl font-bold text-purple-600 dark:text-purple-400">{totalSilences}</span>
-              {totalSilences > 0 && (
-                <span className="text-xs text-purple-600 dark:text-purple-400 opacity-60">
-                  {showSilencesTable ? '▲ fermer' : '▼ voir'}
-                </span>
-              )}
-            </div>
           </div>
-
-          {showSilencesTable && totalSilences > 0 && (
-            <SilencesTable silences={filteredSilences} />
-          )}
 
           {SEVERITIES.filter((s) => expandedSeverities.has(s as Severity)).map((severity) => (
             <AlertsTable
@@ -298,52 +262,6 @@ function AlertsTable({
               </tr>
             );
           })}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-// ── SilencesTable ──────────────────────────────────────────────────────────
-
-function SilencesTable({ silences }: { silences: { silence: Silence; amName: string }[] }) {
-  return (
-    <div className="bg-white dark:bg-gray-800 border-2 border-purple-500 dark:border-purple-600 rounded-xl overflow-hidden">
-      <div className="bg-gray-50 dark:bg-gray-900 border-b-2 border-purple-500 dark:border-purple-600 px-4 py-2 flex items-center gap-2">
-        <span className="w-2 h-2 rounded-full bg-purple-500" />
-        <span className="text-xs font-semibold uppercase tracking-widest text-purple-600 dark:text-purple-400">Silences actifs</span>
-        <span className="text-gray-400 dark:text-gray-500 text-xs">— {silences.length} silence{silences.length !== 1 ? 's' : ''}</span>
-      </div>
-      <table className="w-full text-xs">
-        <thead>
-          <tr className="bg-gray-50 dark:bg-gray-900 text-gray-500 dark:text-gray-400">
-            <th className="text-left px-4 py-2 font-medium">Commentaire</th>
-            <th className="text-left px-4 py-2 font-medium">AlertManager</th>
-            <th className="text-left px-4 py-2 font-medium">Créé par</th>
-            <th className="text-left px-4 py-2 font-medium">Matchers</th>
-            <th className="text-left px-4 py-2 font-medium">Début</th>
-            <th className="text-left px-4 py-2 font-medium">Fin</th>
-          </tr>
-        </thead>
-        <tbody>
-          {silences.map(({ silence, amName }) => (
-            <tr key={silence.id} className="border-t border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/30">
-              <td className="px-4 py-2 text-gray-900 dark:text-white max-w-[200px] truncate" title={silence.comment}>{silence.comment || '—'}</td>
-              <td className="px-4 py-2 text-gray-500 dark:text-gray-400">{amName}</td>
-              <td className="px-4 py-2 text-gray-500 dark:text-gray-400">{silence.createdBy}</td>
-              <td className="px-4 py-2">
-                <div className="flex flex-wrap gap-1">
-                  {silence.matchers.map((m, i) => (
-                    <span key={i} className="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-1.5 py-0.5 rounded font-mono">
-                      {m.name}{m.isEqual ? (m.isRegex ? '=~' : '=') : (m.isRegex ? '!~' : '!=')}&quot;{m.value}&quot;
-                    </span>
-                  ))}
-                </div>
-              </td>
-              <td className="px-4 py-2 text-gray-400 dark:text-gray-500 whitespace-nowrap">{new Date(silence.startsAt).toLocaleString()}</td>
-              <td className="px-4 py-2 text-gray-400 dark:text-gray-500 whitespace-nowrap">{new Date(silence.endsAt).toLocaleString()}</td>
-            </tr>
-          ))}
         </tbody>
       </table>
     </div>

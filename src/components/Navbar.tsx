@@ -28,6 +28,7 @@ export default function Navbar() {
   const links = [
     { href: '/', label: 'Overview' },
     { href: '/alertmanagers', label: 'AlertManagers' },
+    { href: '/silences', label: 'Silences' },
   ];
 
   return (

@@ -32,6 +32,19 @@ export async function fetchSilences(baseUrl: string, proxyUrl?: string, insecure
   return res.json() as Promise<Silence[]>;
 }
 
+export async function expireSilence(baseUrl: string, silenceId: string, proxyUrl?: string, insecure?: boolean): Promise<void> {
+  const url = `${baseUrl}/api/v2/silence/${silenceId}`;
+  const res = await undiciFetch(url, {
+    method: 'DELETE',
+    signal: AbortSignal.timeout(8000),
+    dispatcher: makeDispatcher(proxyUrl, insecure),
+  });
+  if (!res.ok) {
+    const msg = await res.text();
+    throw new Error(`HTTP ${res.status}: ${msg}`);
+  }
+}
+
 export async function createSilence(
   baseUrl: string,
   payload: SilencePayload,

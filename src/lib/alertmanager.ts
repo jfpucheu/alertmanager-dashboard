@@ -5,7 +5,12 @@ export { getSeverity, countBySeverity } from '@/lib/severity';
 function makeDispatcher(proxyUrl?: string, insecure?: boolean): Dispatcher {
   const tls = insecure ? { rejectUnauthorized: false } : undefined;
   if (proxyUrl) {
-    return new ProxyAgent({ uri: proxyUrl, ...(tls ? { connect: tls } : {}) });
+    return new ProxyAgent({
+      uri: proxyUrl,
+      // requestTls = TLS options for the target server through the CONNECT tunnel
+      // proxyTls   = TLS options for the proxy itself (if proxy is HTTPS)
+      ...(tls ? { requestTls: tls, proxyTls: tls } : {}),
+    });
   }
   return new Agent({ ...(tls ? { connect: tls } : {}) });
 }

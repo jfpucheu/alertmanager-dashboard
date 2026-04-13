@@ -221,7 +221,7 @@ function SeverityBadge({ severity, count }: { severity: Severity; count: number 
   };
   return (
     <span className={`text-xs px-2 py-0.5 rounded font-medium ${colors[severity]} ${count === 0 ? 'opacity-30' : ''}`}>
-      {severity[0].toUpperCase()}: {count}
+      {severity}: {count}
     </span>
   );
 }

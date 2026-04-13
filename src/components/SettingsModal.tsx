@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useTheme } from 'next-themes';
 import { useSession, signOut } from 'next-auth/react';
-import { GlobalConfig, LdapConfig } from '@/types/alertmanager';
+import { GlobalConfig } from '@/types/alertmanager';
 
 interface SettingsModalProps {
   onClose: () => void;
@@ -16,15 +16,6 @@ const THEMES = [
   { value: 'system', label: 'System', icon: '💻' },
 ];
 
-const DEFAULT_LDAP: LdapConfig = {
-  enabled: false,
-  url: '',
-  bindDN: '',
-  bindPassword: '',
-  searchBase: '',
-  searchFilter: '(uid={{username}})',
-  displayNameAttr: 'cn',
-};
 
 export default function SettingsModal({ onClose, onBrandingChanged }: SettingsModalProps) {
   const { theme, setTheme } = useTheme();
@@ -34,8 +25,6 @@ export default function SettingsModal({ onClose, onBrandingChanged }: SettingsMo
   const [proxy, setProxy] = useState('');
   const [appTitle, setAppTitle] = useState('');
   const [logoUrl, setLogoUrl] = useState('');
-  const [ldap, setLdap] = useState<LdapConfig>(DEFAULT_LDAP);
-  const [showLdapPassword, setShowLdapPassword] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -48,14 +37,9 @@ export default function SettingsModal({ onClose, onBrandingChanged }: SettingsMo
         setProxy(config.proxy ?? '');
         setAppTitle(config.title ?? '');
         setLogoUrl(config.logoUrl ?? '');
-        setLdap(config.ldap ?? DEFAULT_LDAP);
       })
       .finally(() => setLoading(false));
   }, []);
-
-  function updateLdap(patch: Partial<LdapConfig>) {
-    setLdap((prev) => ({ ...prev, ...patch }));
-  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -65,7 +49,6 @@ export default function SettingsModal({ onClose, onBrandingChanged }: SettingsMo
     try {
       const body: GlobalConfig = {
         proxy: proxy.trim() || undefined,
-        ldap: ldap.url ? ldap : undefined,
         title: appTitle.trim() || undefined,
         logoUrl: logoUrl.trim() || undefined,
       };
@@ -198,57 +181,6 @@ export default function SettingsModal({ onClose, onBrandingChanged }: SettingsMo
                 </p>
               </div>
 
-              <div className="border-t border-gray-200 dark:border-gray-700" />
-
-              {/* LDAP */}
-              <div className="flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <label className="text-gray-700 dark:text-gray-300 text-sm font-medium">Authentification LDAP</label>
-                  <button
-                    type="button"
-                    onClick={() => updateLdap({ enabled: !ldap.enabled })}
-                    className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors ${
-                      ldap.enabled ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
-                    }`}
-                  >
-                    <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transform transition-transform ${ldap.enabled ? 'translate-x-4' : 'translate-x-0'}`} />
-                  </button>
-                </div>
-
-                {ldap.enabled && (
-                  <div className="flex flex-col gap-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
-                    <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded p-2">
-                      Pour que la protection soit active, définissez aussi <code className="font-mono">LDAP_ENABLED=true</code> dans les variables d&apos;environnement.
-                    </p>
-
-                    <LdapField label="URL LDAP" placeholder="ldap://host:389 ou ldaps://host:636" value={ldap.url} onChange={(v) => updateLdap({ url: v })} />
-                    <LdapField label="Bind DN (compte service)" placeholder="CN=svc,DC=example,DC=com" value={ldap.bindDN} onChange={(v) => updateLdap({ bindDN: v })} />
-                    <div>
-                      <label className="block text-gray-600 dark:text-gray-400 text-xs font-medium mb-1">Mot de passe service</label>
-                      <div className="relative">
-                        <input
-                          type={showLdapPassword ? 'text' : 'password'}
-                          value={ldap.bindPassword}
-                          onChange={(e) => updateLdap({ bindPassword: e.target.value })}
-                          placeholder="••••••••"
-                          className="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded px-3 py-1.5 text-xs pr-10"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowLdapPassword((v) => !v)}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xs"
-                        >
-                          {showLdapPassword ? 'Masquer' : 'Afficher'}
-                        </button>
-                      </div>
-                    </div>
-                    <LdapField label="Search Base" placeholder="DC=example,DC=com" value={ldap.searchBase} onChange={(v) => updateLdap({ searchBase: v })} />
-                    <LdapField label="Search Filter" placeholder="(uid={{username}})" value={ldap.searchFilter} onChange={(v) => updateLdap({ searchFilter: v })} />
-                    <LdapField label="Attribut nom affiché" placeholder="cn ou displayName" value={ldap.displayNameAttr} onChange={(v) => updateLdap({ displayNameAttr: v })} />
-                  </div>
-                )}
-              </div>
-
               {error && <p className="text-red-500 text-sm">{error}</p>}
 
               <div className="flex justify-end gap-3">
@@ -273,22 +205,3 @@ export default function SettingsModal({ onClose, onBrandingChanged }: SettingsMo
   );
 }
 
-function LdapField({ label, placeholder, value, onChange }: {
-  label: string;
-  placeholder: string;
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <div>
-      <label className="block text-gray-600 dark:text-gray-400 text-xs font-medium mb-1">{label}</label>
-      <input
-        type="text"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded px-3 py-1.5 text-xs placeholder-gray-400 dark:placeholder-gray-600"
-      />
-    </div>
-  );
-}

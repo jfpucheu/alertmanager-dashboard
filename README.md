@@ -11,7 +11,7 @@ A central dashboard to monitor alerts from multiple [Prometheus Alertmanager](ht
 - **Proxy support** — global proxy or per-AlertManager override (custom / global / none)
 - **TLS** — optional per-AlertManager TLS certificate verification bypass
 - **Branding** — custom title and logo in Settings
-- **LDAP authentication** — optional, enforced via environment variable
+- **LDAP authentication** — optional, configured via environment variables, enforced via `LDAP_ENABLED=true`
 - **Kubernetes storage** — data stored in a ConfigMap (etcd) when running in-cluster, JSON files otherwise
 - **Dark / Light / System theme**
 - **Auto-refresh** every 30 seconds
@@ -81,33 +81,9 @@ In-cluster storage is auto-detected via the `KUBERNETES_SERVICE_HOST` env variab
 
 LDAP is **optional**. When disabled, the app is accessible without login.
 
-LDAP settings can be configured in two ways — they can be combined (env vars take priority):
+### 1 — Configure LDAP via environment variables
 
-| Method | Best for |
-|--------|----------|
-| **UI** (Settings → LDAP) | Quick setup, config stored in ConfigMap / JSON |
-| **Environment variables** | GitOps / Kubernetes, credentials in a Secret |
-
-### 1 — Configure LDAP
-
-**Option A — UI**
-
-Go to **Settings → Authentification LDAP**, enable the toggle, and fill in:
-
-| Field | Description | Example |
-|-------|-------------|---------|
-| URL LDAP | LDAP server URL | `ldap://ldap.example.com:389` or `ldaps://ldap.example.com:636` |
-| Bind DN | Service account DN used to search for users | `CN=svc-dashboard,OU=Services,DC=example,DC=com` |
-| Mot de passe service | Password for the service account | |
-| Search Base | Base DN for user search | `OU=Users,DC=example,DC=com` |
-| Search Filter | LDAP filter to find a user — use `{{username}}` as placeholder | `(uid={{username}})` or `(sAMAccountName={{username}})` |
-| Attribut nom affiché | Attribute used as the display name | `cn` or `displayName` |
-
-Save settings. The config is stored in the same ConfigMap / JSON as the rest of the data.
-
-**Option B — Environment variables**
-
-Set the `LDAP_*` variables (see table above). Any variable that is set overrides the corresponding UI value. The bind password can be stored in a Kubernetes Secret and injected as an env var — it never touches the ConfigMap.
+Set the `LDAP_*` variables (see table above). The bind password can be stored in a Kubernetes Secret and injected as an env var — it never touches the ConfigMap.
 
 ```bash
 LDAP_URL=ldap://ldap.example.com:389

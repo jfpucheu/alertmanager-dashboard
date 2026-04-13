@@ -5,28 +5,27 @@ import { getToken } from 'next-auth/jwt';
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // Always allow auth routes
+  // Always allow auth routes and login page
   if (pathname.startsWith('/api/auth') || pathname === '/login') {
     return NextResponse.next();
   }
 
-  // Check LDAP enabled via a lightweight API check
-  // We read the cookie-based JWT token to know if logged in
-  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-
-  // If no token and not a public path, check if LDAP is required
-  if (!token) {
-    // Ask the config API — but we can't call internal APIs from middleware easily.
-    // Instead, we use a special header set by the app startup or a separate env var.
-    // Simplest approach: if LDAP_ENABLED env var is set, enforce auth.
-    if (process.env.LDAP_ENABLED === 'true') {
-      const loginUrl = new URL('/login', req.url);
-      loginUrl.searchParams.set('callbackUrl', req.url);
-      return NextResponse.redirect(loginUrl);
-    }
+  // If LDAP enforcement is not enabled, allow all requests
+  if (process.env.LDAP_ENABLED !== 'true') {
+    return NextResponse.next();
   }
 
-  return NextResponse.next();
+  // LDAP is enabled — require a valid session
+  try {
+    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+    if (token) return NextResponse.next();
+  } catch {
+    // getToken failure (e.g. missing secret) → treat as unauthenticated
+  }
+
+  const loginUrl = new URL('/login', req.url);
+  loginUrl.searchParams.set('callbackUrl', req.url);
+  return NextResponse.redirect(loginUrl);
 }
 
 export const config = {

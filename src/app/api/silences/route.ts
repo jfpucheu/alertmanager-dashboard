@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAlertManagers, getConfig, resolveProxy } from '@/lib/store';
-import { fetchSilences, createSilence, expireSilence } from '@/lib/alertmanager';
-import { SilencePayload, AMSilences } from '@/types/alertmanager';
+import { fetchSilences, createSilence, expireSilence, extendSilence } from '@/lib/alertmanager';
+import { SilencePayload, AMSilences, Silence } from '@/types/alertmanager';
 
 export async function GET() {
   const [alertManagers, config] = await Promise.all([getAlertManagers(), getConfig()]);
@@ -17,6 +17,24 @@ export async function GET() {
     })
   );
   return NextResponse.json(results);
+}
+
+export async function PATCH(req: NextRequest) {
+  const body = await req.json() as { alertManagerId: string; silence: Silence; extraMs: number };
+  const { alertManagerId, silence, extraMs } = body;
+  if (!alertManagerId || !silence || !extraMs) {
+    return NextResponse.json({ error: 'alertManagerId, silence and extraMs are required' }, { status: 400 });
+  }
+  const [alertManagers, config] = await Promise.all([getAlertManagers(), getConfig()]);
+  const am = alertManagers.find((a) => a.id === alertManagerId);
+  if (!am) return NextResponse.json({ error: 'AlertManager not found' }, { status: 404 });
+  const proxy = resolveProxy(am, config);
+  try {
+    const result = await extendSilence(am.url, silence, extraMs, proxy, am.insecure);
+    return NextResponse.json(result);
+  } catch (err) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : 'Failed' }, { status: 500 });
+  }
 }
 
 export async function DELETE(req: NextRequest) {

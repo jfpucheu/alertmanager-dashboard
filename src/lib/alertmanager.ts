@@ -45,6 +45,39 @@ export async function expireSilence(baseUrl: string, silenceId: string, proxyUrl
   }
 }
 
+/** Extend a silence by posting the same payload with updated endsAt (AM accepts id to update). */
+export async function extendSilence(
+  baseUrl: string,
+  silence: Silence,
+  extraMs: number,
+  proxyUrl?: string,
+  insecure?: boolean,
+): Promise<{ silenceID: string }> {
+  const url = `${baseUrl}/api/v2/silences`;
+  const currentEnd = new Date(silence.endsAt).getTime();
+  const newEnd = new Date(Math.max(currentEnd, Date.now()) + extraMs).toISOString();
+  const payload = {
+    id: silence.id,
+    matchers: silence.matchers,
+    startsAt: silence.startsAt,
+    endsAt: newEnd,
+    comment: silence.comment,
+    createdBy: silence.createdBy,
+  };
+  const res = await undiciFetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(8000),
+    dispatcher: makeDispatcher(proxyUrl, insecure),
+  });
+  if (!res.ok) {
+    const msg = await res.text();
+    throw new Error(`HTTP ${res.status}: ${msg}`);
+  }
+  return res.json() as Promise<{ silenceID: string }>;
+}
+
 export async function createSilence(
   baseUrl: string,
   payload: SilencePayload,

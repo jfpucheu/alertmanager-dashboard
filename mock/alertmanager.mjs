@@ -247,9 +247,17 @@ const server = http.createServer(async (req, res) => {
     return json(res, 200, silences);
   }
 
-  // POST /api/v2/silences
+  // POST /api/v2/silences  (create or update if body.id provided)
   if (req.method === 'POST' && path === '/api/v2/silences') {
     const body = await readBody(req);
+    if (body.id) {
+      const idx = silences.findIndex((s) => s.id === body.id);
+      if (idx !== -1) {
+        silences[idx] = { ...silences[idx], ...body, status: { state: 'active' } };
+        console.log(`  → Updated silence ${body.id} (new endsAt: ${body.endsAt})`);
+        return json(res, 200, { silenceID: body.id });
+      }
+    }
     const id = Math.random().toString(36).slice(2, 10);
     const silence = { ...body, id, status: { state: 'active' } };
     silences.push(silence);

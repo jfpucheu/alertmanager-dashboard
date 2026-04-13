@@ -29,6 +29,7 @@ export default function SilencesPage() {
   const [selectedAmId, setSelectedAmId] = useState('');
   const [search, setSearch] = useState('');
   const [expiring, setExpiring] = useState<string | null>(null);
+  const [extending, setExtending] = useState<string | null>(null);
   const [showExpired, setShowExpired] = useState(false);
 
   const fetchData = useCallback(async () => {
@@ -48,6 +49,21 @@ export default function SilencesPage() {
     const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
   }, [fetchData]);
+
+  async function handleExtend(amId: string, silence: Silence, extraMs: number) {
+    setExtending(silence.id);
+    try {
+      const res = await fetch('/api/silences', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ alertManagerId: amId, silence, extraMs }),
+      });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.error ?? 'Failed'); }
+      await fetchData();
+    } finally {
+      setExtending(null);
+    }
+  }
 
   async function handleExpire(amId: string, silenceId: string) {
     if (!confirm('Expirer ce silence ?')) return;
@@ -154,7 +170,9 @@ export default function SilencesPage() {
           silences={[...active, ...pending]}
           color="purple"
           expiring={expiring}
+          extending={extending}
           onExpire={handleExpire}
+          onExtend={handleExtend}
           showExpireButton
         />
       ) : (
@@ -179,7 +197,9 @@ export default function SilencesPage() {
               silences={expired}
               color="gray"
               expiring={expiring}
+              extending={extending}
               onExpire={handleExpire}
+              onExtend={handleExtend}
               showExpireButton={false}
             />
           )}
@@ -208,15 +228,27 @@ const COLOR = {
   },
 };
 
-function SilenceTable({ title, silences, color, expiring, onExpire, showExpireButton }: {
+const EXTEND_OPTIONS = [
+  { label: '+1h',  ms: 3_600_000 },
+  { label: '+4h',  ms: 14_400_000 },
+  { label: '+8h',  ms: 28_800_000 },
+  { label: '+1j',  ms: 86_400_000 },
+  { label: '+7j',  ms: 604_800_000 },
+];
+
+function SilenceTable({ title, silences, color, expiring, extending, onExpire, onExtend, showExpireButton }: {
   title: string;
   silences: { silence: Silence; amName: string; amId: string }[];
   color: keyof typeof COLOR;
   expiring: string | null;
+  extending: string | null;
   onExpire: (amId: string, id: string) => void;
+  onExtend: (amId: string, silence: Silence, extraMs: number) => void;
   showExpireButton: boolean;
 }) {
+  const [openExtend, setOpenExtend] = useState<string | null>(null);
   const c = COLOR[color];
+
   return (
     <div className={`bg-white dark:bg-gray-800 border-2 ${c.border} rounded-xl overflow-hidden`}>
       <div className={`bg-gray-50 dark:bg-gray-900 border-b-2 ${c.border} px-4 py-2 flex items-center gap-2`}>
@@ -237,40 +269,76 @@ function SilenceTable({ title, silences, color, expiring, onExpire, showExpireBu
           </tr>
         </thead>
         <tbody>
-          {silences.map(({ silence, amName, amId }) => (
-            <tr
-              key={`${amId}::${silence.id}`}
-              className={`border-t border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/30 ${color === 'gray' ? 'opacity-60' : ''}`}
-            >
-              <td className="px-4 py-2 text-gray-900 dark:text-white max-w-[180px] truncate" title={silence.comment}>
-                {silence.comment || '—'}
-              </td>
-              <td className="px-4 py-2 text-gray-500 dark:text-gray-400">{amName}</td>
-              <td className="px-4 py-2 text-gray-500 dark:text-gray-400">{silence.createdBy}</td>
-              <td className="px-4 py-2">
-                <div className="flex flex-wrap gap-1">
-                  {silence.matchers.map((m, i) => (
-                    <span key={i} className="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-1.5 py-0.5 rounded font-mono">
-                      {m.name}{m.isEqual ? (m.isRegex ? '=~' : '=') : (m.isRegex ? '!~' : '!=')}&quot;{m.value}&quot;
-                    </span>
-                  ))}
-                </div>
-              </td>
-              <td className="px-4 py-2 text-gray-400 dark:text-gray-500 whitespace-nowrap">{new Date(silence.startsAt).toLocaleString()}</td>
-              <td className="px-4 py-2 text-gray-400 dark:text-gray-500 whitespace-nowrap">{new Date(silence.endsAt).toLocaleString()}</td>
-              {showExpireButton && (
-                <td className="px-4 py-2 text-right">
-                  <button
-                    onClick={() => onExpire(amId, silence.id)}
-                    disabled={expiring === silence.id}
-                    className="text-red-500 hover:text-red-400 text-xs border border-red-200 dark:border-red-900 hover:border-red-400 dark:hover:border-red-700 px-2 py-0.5 rounded disabled:opacity-50 transition-colors"
-                  >
-                    {expiring === silence.id ? '…' : 'Expirer'}
-                  </button>
+          {silences.map(({ silence, amName, amId }) => {
+            const rowKey = `${amId}::${silence.id}`;
+            const isExtending = extending === silence.id;
+            const showExtendPicker = openExtend === silence.id;
+            return (
+              <tr
+                key={rowKey}
+                className={`border-t border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/30 ${color === 'gray' ? 'opacity-60' : ''}`}
+              >
+                <td className="px-4 py-2 text-gray-900 dark:text-white max-w-[180px] truncate" title={silence.comment}>
+                  {silence.comment || '—'}
                 </td>
-              )}
-            </tr>
-          ))}
+                <td className="px-4 py-2 text-gray-500 dark:text-gray-400">{amName}</td>
+                <td className="px-4 py-2 text-gray-500 dark:text-gray-400">{silence.createdBy}</td>
+                <td className="px-4 py-2">
+                  <div className="flex flex-wrap gap-1">
+                    {silence.matchers.map((m, i) => (
+                      <span key={i} className="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-1.5 py-0.5 rounded font-mono">
+                        {m.name}{m.isEqual ? (m.isRegex ? '=~' : '=') : (m.isRegex ? '!~' : '!=')}&quot;{m.value}&quot;
+                      </span>
+                    ))}
+                  </div>
+                </td>
+                <td className="px-4 py-2 text-gray-400 dark:text-gray-500 whitespace-nowrap">{new Date(silence.startsAt).toLocaleString()}</td>
+                <td className="px-4 py-2 text-gray-400 dark:text-gray-500 whitespace-nowrap">{new Date(silence.endsAt).toLocaleString()}</td>
+                {showExpireButton && (
+                  <td className="px-4 py-2">
+                    <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                      {/* Extend picker */}
+                      {showExtendPicker ? (
+                        <>
+                          {EXTEND_OPTIONS.map((opt) => (
+                            <button
+                              key={opt.label}
+                              disabled={isExtending}
+                              onClick={() => { onExtend(amId, silence, opt.ms); setOpenExtend(null); }}
+                              className="text-green-600 dark:text-green-400 hover:text-green-500 text-xs border border-green-300 dark:border-green-800 hover:border-green-400 px-1.5 py-0.5 rounded disabled:opacity-50 transition-colors"
+                            >
+                              {isExtending ? '…' : opt.label}
+                            </button>
+                          ))}
+                          <button
+                            onClick={() => setOpenExtend(null)}
+                            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xs px-1 py-0.5"
+                          >
+                            ✕
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => setOpenExtend(silence.id)}
+                          disabled={isExtending}
+                          className="text-green-600 dark:text-green-400 hover:text-green-500 text-xs border border-green-300 dark:border-green-800 hover:border-green-400 px-2 py-0.5 rounded disabled:opacity-50 transition-colors"
+                        >
+                          {isExtending ? '…' : 'Prolonger'}
+                        </button>
+                      )}
+                      <button
+                        onClick={() => onExpire(amId, silence.id)}
+                        disabled={expiring === silence.id}
+                        className="text-red-500 hover:text-red-400 text-xs border border-red-200 dark:border-red-900 hover:border-red-400 dark:hover:border-red-700 px-2 py-0.5 rounded disabled:opacity-50 transition-colors"
+                      >
+                        {expiring === silence.id ? '…' : 'Expirer'}
+                      </button>
+                    </div>
+                  </td>
+                )}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

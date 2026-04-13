@@ -60,6 +60,15 @@ export interface SilenceMatcher {
   isEqual: boolean;
 }
 
+export interface Assignment {
+  /** key = `${amId}::${fingerprint}` */
+  key: string;
+  name: string;
+  assignedAt: string;
+}
+
+export type AssignmentMap = Record<string, Assignment>;
+
 export interface SilencePayload {
   matchers: SilenceMatcher[];
   startsAt: string;

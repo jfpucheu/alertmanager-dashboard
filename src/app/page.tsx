@@ -3,8 +3,9 @@
 import { useEffect, useState, useCallback } from 'react';
 import SeverityCard from '@/components/SeverityCard';
 import SilenceModal from '@/components/SilenceModal';
-import { AlertManagerStatus, SeverityCounts, Severity, SEVERITIES, AlertManager, Alert } from '@/types/alertmanager';
+import { AlertManagerStatus, SeverityCounts, Severity, SEVERITIES, AlertManager, Alert, AssignmentMap } from '@/types/alertmanager';
 import { getSeverity } from '@/lib/severity';
+import AssignCell from '@/components/AssignCell';
 
 const EMPTY_COUNTS: SeverityCounts = { critical: 0, error: 0, warning: 0, info: 0, none: 0 };
 
@@ -23,13 +24,15 @@ export default function HomePage() {
   const [showSilence, setShowSilence] = useState(false);
   const [silenceAlert, setSilenceAlert] = useState<{ am: AlertManager; alert: Alert } | null>(null);
   const [expandedSeverities, setExpandedSeverities] = useState<Set<Severity>>(new Set());
+  const [assignments, setAssignments] = useState<AssignmentMap>({});
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [alertsRes, amsRes] = await Promise.all([fetch('/api/alerts'), fetch('/api/alertmanagers')]);
+      const [alertsRes, amsRes, assignRes] = await Promise.all([fetch('/api/alerts'), fetch('/api/alertmanagers'), fetch('/api/assignments')]);
       setData(await alertsRes.json());
       setAlertManagers(await amsRes.json());
+      setAssignments(await assignRes.json());
       setLastRefresh(new Date());
     } finally {
       setLoading(false);
@@ -127,7 +130,9 @@ export default function HomePage() {
               key={severity}
               severity={severity as Severity}
               alerts={allAlerts.filter((fa) => getSeverity(fa.alert) === severity)}
+              assignments={assignments}
               onSilence={(fa) => setSilenceAlert({ am: fa.am, alert: fa.alert })}
+              onAssignmentChanged={fetchData}
             />
           ))}
         </>
@@ -177,7 +182,15 @@ const SEVERITY_BORDER: Record<Severity, { border: string; label: string }> = {
   none:     { border: 'border-gray-400 dark:border-gray-500',     label: 'text-gray-500 dark:text-gray-400' },
 };
 
-function AlertsTable({ severity, alerts, onSilence }: { severity: Severity; alerts: FlatAlert[]; onSilence: (fa: FlatAlert) => void }) {
+function AlertsTable({
+  severity, alerts, assignments, onSilence, onAssignmentChanged,
+}: {
+  severity: Severity;
+  alerts: FlatAlert[];
+  assignments: AssignmentMap;
+  onSilence: (fa: FlatAlert) => void;
+  onAssignmentChanged: () => void;
+}) {
   const { border, label } = SEVERITY_BORDER[severity];
   return (
     <div className={`bg-white dark:bg-gray-800 border-2 ${border} rounded-xl overflow-hidden`}>
@@ -193,23 +206,30 @@ function AlertsTable({ severity, alerts, onSilence }: { severity: Severity; aler
             <th className="text-left px-4 py-2 font-medium">AlertManager</th>
             <th className="text-left px-4 py-2 font-medium">Instance</th>
             <th className="text-left px-4 py-2 font-medium">Since</th>
+            <th className="text-left px-4 py-2 font-medium">Affecté</th>
             <th className="px-4 py-2" />
           </tr>
         </thead>
         <tbody>
-          {alerts.map((fa) => (
-            <tr key={`${fa.amId}-${fa.alert.fingerprint}`} className="border-t border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/30">
-              <td className="px-4 py-2 text-gray-900 dark:text-white">{fa.alert.labels.alertname ?? '—'}</td>
-              <td className="px-4 py-2 text-gray-500 dark:text-gray-400">{fa.amName}</td>
-              <td className="px-4 py-2 text-gray-500 dark:text-gray-400">{fa.alert.labels.instance ?? fa.alert.labels.job ?? '—'}</td>
-              <td className="px-4 py-2 text-gray-400 dark:text-gray-500">{new Date(fa.alert.startsAt).toLocaleString()}</td>
-              <td className="px-4 py-2 text-right">
-                <button onClick={() => onSilence(fa)} className="text-orange-500 hover:text-orange-400 text-xs border border-orange-300 dark:border-orange-900 hover:border-orange-400 dark:hover:border-orange-700 px-2 py-0.5 rounded">
-                  Silence
-                </button>
-              </td>
-            </tr>
-          ))}
+          {alerts.map((fa) => {
+            const key = `${fa.amId}::${fa.alert.fingerprint}`;
+            return (
+              <tr key={key} className="border-t border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                <td className="px-4 py-2 text-gray-900 dark:text-white">{fa.alert.labels.alertname ?? '—'}</td>
+                <td className="px-4 py-2 text-gray-500 dark:text-gray-400">{fa.amName}</td>
+                <td className="px-4 py-2 text-gray-500 dark:text-gray-400">{fa.alert.labels.instance ?? fa.alert.labels.job ?? '—'}</td>
+                <td className="px-4 py-2 text-gray-400 dark:text-gray-500">{new Date(fa.alert.startsAt).toLocaleString()}</td>
+                <td className="px-4 py-2">
+                  <AssignCell amId={fa.amId} fingerprint={fa.alert.fingerprint} assignment={assignments[key]} onChanged={onAssignmentChanged} />
+                </td>
+                <td className="px-4 py-2 text-right">
+                  <button onClick={() => onSilence(fa)} className="text-orange-500 hover:text-orange-400 text-xs border border-orange-300 dark:border-orange-900 hover:border-orange-400 dark:hover:border-orange-700 px-2 py-0.5 rounded">
+                    Silence
+                  </button>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

@@ -3,7 +3,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import AddAlertManagerModal from '@/components/AddAlertManagerModal';
 import SilenceModal from '@/components/SilenceModal';
-import { AlertManagerStatus, AlertManager, Alert, Severity, SEVERITIES } from '@/types/alertmanager';
+import { AlertManagerStatus, AlertManager, Alert, Severity, SEVERITIES, AssignmentMap } from '@/types/alertmanager';
+import AssignCell from '@/components/AssignCell';
 
 function ProxyBadge({ am }: { am: AlertManager }) {
   if (am.noProxy) {
@@ -26,13 +27,15 @@ export default function AlertManagersPage() {
     silenceAll?: boolean;
   } | null>(null);
   const [expandedAM, setExpandedAM] = useState<string | null>(null);
+  const [assignments, setAssignments] = useState<AssignmentMap>({});
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [alertsRes, amsRes] = await Promise.all([fetch('/api/alerts'), fetch('/api/alertmanagers')]);
+      const [alertsRes, amsRes, assignRes] = await Promise.all([fetch('/api/alerts'), fetch('/api/alertmanagers'), fetch('/api/assignments')]);
       setData(await alertsRes.json());
       setAlertManagers(await amsRes.json());
+      setAssignments(await assignRes.json());
     } finally {
       setLoading(false);
     }
@@ -135,12 +138,20 @@ export default function AlertManagersPage() {
                       <th className="text-left px-4 py-2 font-medium">Severity</th>
                       <th className="text-left px-4 py-2 font-medium">Instance</th>
                       <th className="text-left px-4 py-2 font-medium">Since</th>
+                      <th className="text-left px-4 py-2 font-medium">Affecté</th>
                       <th className="px-4 py-2" />
                     </tr>
                   </thead>
                   <tbody>
                     {item.alerts.map((alert) => (
-                      <AlertRow key={alert.fingerprint} alert={alert} onSilence={() => setSilenceContext({ am: item.alertManager, alert })} />
+                      <AlertRow
+                        key={alert.fingerprint}
+                        alert={alert}
+                        amId={item.alertManager.id}
+                        assignments={assignments}
+                        onSilence={() => setSilenceContext({ am: item.alertManager, alert })}
+                        onAssignmentChanged={fetchData}
+                      />
                     ))}
                   </tbody>
                 </table>
@@ -183,7 +194,13 @@ function SeverityBadge({ severity, count }: { severity: Severity; count: number 
   );
 }
 
-function AlertRow({ alert, onSilence }: { alert: Alert; onSilence: () => void }) {
+function AlertRow({ alert, amId, assignments, onSilence, onAssignmentChanged }: {
+  alert: Alert;
+  amId: string;
+  assignments: AssignmentMap;
+  onSilence: () => void;
+  onAssignmentChanged: () => void;
+}) {
   const severity = (alert.labels.severity ?? 'none').toLowerCase();
   const severityColors: Record<string, string> = {
     critical: 'text-red-600 dark:text-red-400',
@@ -198,6 +215,9 @@ function AlertRow({ alert, onSilence }: { alert: Alert; onSilence: () => void })
       <td className={`px-4 py-2 font-semibold ${severityColors[severity] ?? severityColors.none}`}>{severity}</td>
       <td className="px-4 py-2 text-gray-500 dark:text-gray-400">{alert.labels.instance ?? alert.labels.job ?? '—'}</td>
       <td className="px-4 py-2 text-gray-400 dark:text-gray-500">{new Date(alert.startsAt).toLocaleString()}</td>
+      <td className="px-4 py-2">
+        <AssignCell amId={amId} fingerprint={alert.fingerprint} assignment={assignments[`${amId}::${alert.fingerprint}`]} onChanged={onAssignmentChanged} />
+      </td>
       <td className="px-4 py-2 text-right">
         <button onClick={onSilence} className="text-orange-500 hover:text-orange-400 text-xs border border-orange-300 dark:border-orange-900 hover:border-orange-400 dark:hover:border-orange-700 px-2 py-0.5 rounded">
           Silence

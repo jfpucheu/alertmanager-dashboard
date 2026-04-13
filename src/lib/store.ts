@@ -1,10 +1,11 @@
 import fs from 'fs';
 import path from 'path';
-import { AlertManager, GlobalConfig } from '@/types/alertmanager';
+import { AlertManager, GlobalConfig, Assignment, AssignmentMap } from '@/types/alertmanager';
 
 const DATA_DIR = path.join(process.cwd(), 'data');
 const AM_FILE = path.join(DATA_DIR, 'alertmanagers.json');
 const CONFIG_FILE = path.join(DATA_DIR, 'config.json');
+const ASSIGNMENTS_FILE = path.join(DATA_DIR, 'assignments.json');
 
 function ensureDataDir() {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -61,6 +62,32 @@ export function getConfig(): GlobalConfig {
 export function saveConfig(config: GlobalConfig): void {
   ensureDataDir();
   fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
+}
+
+// ── Assignments ────────────────────────────────────────────────
+
+export function getAssignments(): AssignmentMap {
+  ensureDataDir();
+  if (!fs.existsSync(ASSIGNMENTS_FILE)) return {};
+  try { return JSON.parse(fs.readFileSync(ASSIGNMENTS_FILE, 'utf-8')); } catch { return {}; }
+}
+
+export function setAssignment(amId: string, fingerprint: string, name: string): Assignment {
+  const map = getAssignments();
+  const key = `${amId}::${fingerprint}`;
+  const assignment: Assignment = { key, name, assignedAt: new Date().toISOString() };
+  map[key] = assignment;
+  fs.writeFileSync(ASSIGNMENTS_FILE, JSON.stringify(map, null, 2));
+  return assignment;
+}
+
+export function removeAssignment(amId: string, fingerprint: string): boolean {
+  const map = getAssignments();
+  const key = `${amId}::${fingerprint}`;
+  if (!map[key]) return false;
+  delete map[key];
+  fs.writeFileSync(ASSIGNMENTS_FILE, JSON.stringify(map, null, 2));
+  return true;
 }
 
 // ── Proxy resolution ───────────────────────────────────────────

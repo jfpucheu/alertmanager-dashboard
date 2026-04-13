@@ -83,6 +83,24 @@ export interface Assignment {
 
 export type AssignmentMap = Record<string, Assignment>;
 
+export interface Silence {
+  id: string;
+  matchers: SilenceMatcher[];
+  startsAt: string;
+  endsAt: string;
+  updatedAt: string;
+  createdBy: string;
+  comment: string;
+  status: { state: 'active' | 'pending' | 'expired' };
+}
+
+export interface AMSilences {
+  alertManager: AlertManager;
+  silences: Silence[];
+  reachable: boolean;
+  error?: string;
+}
+
 export interface SilencePayload {
   matchers: SilenceMatcher[];
   startsAt: string;

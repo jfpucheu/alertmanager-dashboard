@@ -1,7 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAlertManagers, getConfig, resolveProxy } from '@/lib/store';
-import { createSilence } from '@/lib/alertmanager';
-import { SilencePayload } from '@/types/alertmanager';
+import { fetchSilences, createSilence } from '@/lib/alertmanager';
+import { SilencePayload, AMSilences } from '@/types/alertmanager';
+
+export async function GET() {
+  const [alertManagers, config] = await Promise.all([getAlertManagers(), getConfig()]);
+  const results: AMSilences[] = await Promise.all(
+    alertManagers.map(async (am) => {
+      const proxy = resolveProxy(am, config);
+      try {
+        const all = await fetchSilences(am.url, proxy, am.insecure);
+        const silences = all.filter((s) => s.status.state === 'active');
+        return { alertManager: am, silences, reachable: true };
+      } catch (err) {
+        return { alertManager: am, silences: [], reachable: false, error: err instanceof Error ? err.message : 'Unknown error' };
+      }
+    })
+  );
+  return NextResponse.json(results);
+}
 
 export async function POST(req: NextRequest) {
   const body = await req.json();

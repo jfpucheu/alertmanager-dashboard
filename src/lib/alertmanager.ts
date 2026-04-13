@@ -1,5 +1,5 @@
 import { fetch as undiciFetch, ProxyAgent, Agent, type Dispatcher } from 'undici';
-import { Alert, SilencePayload } from '@/types/alertmanager';
+import { Alert, Silence, SilencePayload } from '@/types/alertmanager';
 export { getSeverity, countBySeverity } from '@/lib/severity';
 
 function makeDispatcher(proxyUrl?: string, insecure?: boolean): Dispatcher {
@@ -19,6 +19,17 @@ export async function fetchAlerts(baseUrl: string, proxyUrl?: string, insecure?:
   });
   if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
   return res.json() as Promise<Alert[]>;
+}
+
+export async function fetchSilences(baseUrl: string, proxyUrl?: string, insecure?: boolean): Promise<Silence[]> {
+  const url = `${baseUrl}/api/v2/silences`;
+  const res = await undiciFetch(url, {
+    headers: { Accept: 'application/json' },
+    signal: AbortSignal.timeout(8000),
+    dispatcher: makeDispatcher(proxyUrl, insecure),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+  return res.json() as Promise<Silence[]>;
 }
 
 export async function createSilence(

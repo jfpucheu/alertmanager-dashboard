@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getConfig, saveConfig } from '@/lib/store';
 
 export async function GET() {
-  return NextResponse.json(getConfig());
+  return NextResponse.json(await getConfig());
 }
 
 export async function PUT(req: NextRequest) {
@@ -10,15 +10,13 @@ export async function PUT(req: NextRequest) {
   const { proxy } = body;
 
   if (proxy !== undefined && proxy !== '' && proxy !== null) {
-    try {
-      new URL(proxy);
-    } catch {
+    try { new URL(proxy); } catch {
       return NextResponse.json({ error: 'Invalid proxy URL format' }, { status: 400 });
     }
   }
 
-  const config = getConfig();
+  const config = await getConfig();
   config.proxy = proxy || undefined;
-  saveConfig(config);
+  await saveConfig(config);
   return NextResponse.json(config);
 }

@@ -4,20 +4,14 @@ import { fetchAlerts, countBySeverity } from '@/lib/alertmanager';
 import { AlertManagerStatus } from '@/types/alertmanager';
 
 export async function GET() {
-  const alertManagers = getAlertManagers();
-  const config = getConfig();
+  const [alertManagers, config] = await Promise.all([getAlertManagers(), getConfig()]);
 
   const results: AlertManagerStatus[] = await Promise.all(
     alertManagers.map(async (am) => {
       const proxy = resolveProxy(am, config);
       try {
         const alerts = await fetchAlerts(am.url, proxy);
-        return {
-          alertManager: am,
-          alerts,
-          severityCounts: countBySeverity(alerts),
-          reachable: true,
-        };
+        return { alertManager: am, alerts, severityCounts: countBySeverity(alerts), reachable: true };
       } catch (err) {
         return {
           alertManager: am,

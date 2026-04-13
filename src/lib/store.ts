@@ -1,31 +1,61 @@
 import fs from 'fs';
 import path from 'path';
 import { AlertManager, GlobalConfig, Assignment, AssignmentMap } from '@/types/alertmanager';
+import { isInCluster, getConfigMapData, setConfigMapKey } from '@/lib/k8s';
+
+// ── Storage abstraction ────────────────────────────────────────
+// In-cluster  → Kubernetes ConfigMap (data stored in etcd)
+// Local dev   → JSON files under /data
 
 const DATA_DIR = path.join(process.cwd(), 'data');
-const AM_FILE = path.join(DATA_DIR, 'alertmanagers.json');
-const CONFIG_FILE = path.join(DATA_DIR, 'config.json');
-const ASSIGNMENTS_FILE = path.join(DATA_DIR, 'assignments.json');
+const FILES = {
+  alertmanagers: path.join(DATA_DIR, 'alertmanagers.json'),
+  config:        path.join(DATA_DIR, 'config.json'),
+  assignments:   path.join(DATA_DIR, 'assignments.json'),
+};
 
 function ensureDataDir() {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
-// ── AlertManagers ──────────────────────────────────────────────
+// ── Generic read/write ─────────────────────────────────────────
 
-export function getAlertManagers(): AlertManager[] {
+async function readKey<T>(key: string, fallback: T): Promise<T> {
+  if (isInCluster()) {
+    const data = await getConfigMapData();
+    if (!data[key]) return fallback;
+    try { return JSON.parse(data[key]); } catch { return fallback; }
+  }
   ensureDataDir();
-  if (!fs.existsSync(AM_FILE)) fs.writeFileSync(AM_FILE, '[]');
-  return JSON.parse(fs.readFileSync(AM_FILE, 'utf-8'));
+  const file = FILES[key as keyof typeof FILES];
+  if (!file || !fs.existsSync(file)) return fallback;
+  try { return JSON.parse(fs.readFileSync(file, 'utf-8')); } catch { return fallback; }
 }
 
-export function addAlertManager(data: {
+async function writeKey<T>(key: string, value: T): Promise<void> {
+  const json = JSON.stringify(value, null, 2);
+  if (isInCluster()) {
+    await setConfigMapKey(key, json);
+    return;
+  }
+  ensureDataDir();
+  const file = FILES[key as keyof typeof FILES];
+  if (file) fs.writeFileSync(file, json);
+}
+
+// ── AlertManagers ──────────────────────────────────────────────
+
+export async function getAlertManagers(): Promise<AlertManager[]> {
+  return readKey<AlertManager[]>('alertmanagers', []);
+}
+
+export async function addAlertManager(data: {
   name: string;
   url: string;
   proxy?: string;
   noProxy?: boolean;
-}): AlertManager {
-  const list = getAlertManagers();
+}): Promise<AlertManager> {
+  const list = await getAlertManagers();
   const newAM: AlertManager = {
     id: crypto.randomUUID(),
     name: data.name,
@@ -35,64 +65,54 @@ export function addAlertManager(data: {
     ...(data.noProxy ? { noProxy: true } : {}),
   };
   list.push(newAM);
-  fs.writeFileSync(AM_FILE, JSON.stringify(list, null, 2));
+  await writeKey('alertmanagers', list);
   return newAM;
 }
 
-export function removeAlertManager(id: string): boolean {
-  const list = getAlertManagers();
+export async function removeAlertManager(id: string): Promise<boolean> {
+  const list = await getAlertManagers();
   const filtered = list.filter((am) => am.id !== id);
   if (filtered.length === list.length) return false;
-  fs.writeFileSync(AM_FILE, JSON.stringify(filtered, null, 2));
+  await writeKey('alertmanagers', filtered);
   return true;
 }
 
 // ── Global config ──────────────────────────────────────────────
 
-export function getConfig(): GlobalConfig {
-  ensureDataDir();
-  if (!fs.existsSync(CONFIG_FILE)) return {};
-  try {
-    return JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf-8'));
-  } catch {
-    return {};
-  }
+export async function getConfig(): Promise<GlobalConfig> {
+  return readKey<GlobalConfig>('config', {});
 }
 
-export function saveConfig(config: GlobalConfig): void {
-  ensureDataDir();
-  fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
+export async function saveConfig(config: GlobalConfig): Promise<void> {
+  await writeKey('config', config);
 }
 
 // ── Assignments ────────────────────────────────────────────────
 
-export function getAssignments(): AssignmentMap {
-  ensureDataDir();
-  if (!fs.existsSync(ASSIGNMENTS_FILE)) return {};
-  try { return JSON.parse(fs.readFileSync(ASSIGNMENTS_FILE, 'utf-8')); } catch { return {}; }
+export async function getAssignments(): Promise<AssignmentMap> {
+  return readKey<AssignmentMap>('assignments', {});
 }
 
-export function setAssignment(amId: string, fingerprint: string, name: string): Assignment {
-  const map = getAssignments();
+export async function setAssignment(amId: string, fingerprint: string, name: string): Promise<Assignment> {
+  const map = await getAssignments();
   const key = `${amId}::${fingerprint}`;
   const assignment: Assignment = { key, name, assignedAt: new Date().toISOString() };
   map[key] = assignment;
-  fs.writeFileSync(ASSIGNMENTS_FILE, JSON.stringify(map, null, 2));
+  await writeKey('assignments', map);
   return assignment;
 }
 
-export function removeAssignment(amId: string, fingerprint: string): boolean {
-  const map = getAssignments();
+export async function removeAssignment(amId: string, fingerprint: string): Promise<boolean> {
+  const map = await getAssignments();
   const key = `${amId}::${fingerprint}`;
   if (!map[key]) return false;
   delete map[key];
-  fs.writeFileSync(ASSIGNMENTS_FILE, JSON.stringify(map, null, 2));
+  await writeKey('assignments', map);
   return true;
 }
 
 // ── Proxy resolution ───────────────────────────────────────────
 
-/** Returns the effective proxy URL for a given AlertManager. */
 export function resolveProxy(am: AlertManager, config: GlobalConfig): string | undefined {
   if (am.noProxy) return undefined;
   if (am.proxy) return am.proxy;

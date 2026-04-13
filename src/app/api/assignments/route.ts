@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAssignments, setAssignment, removeAssignment } from '@/lib/store';
 
 export async function GET() {
-  return NextResponse.json(getAssignments());
+  return NextResponse.json(await getAssignments());
 }
 
 export async function POST(req: NextRequest) {
@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
   if (!amId || !fingerprint || !name?.trim()) {
     return NextResponse.json({ error: 'amId, fingerprint and name are required' }, { status: 400 });
   }
-  const assignment = setAssignment(amId, fingerprint, name.trim());
+  const assignment = await setAssignment(amId, fingerprint, name.trim());
   return NextResponse.json(assignment);
 }
 
@@ -21,6 +21,6 @@ export async function DELETE(req: NextRequest) {
   if (!amId || !fingerprint) {
     return NextResponse.json({ error: 'amId and fingerprint are required' }, { status: 400 });
   }
-  removeAssignment(amId, fingerprint);
+  await removeAssignment(amId, fingerprint);
   return NextResponse.json({ success: true });
 }

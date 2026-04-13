@@ -5,24 +5,17 @@ import { SilencePayload } from '@/types/alertmanager';
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { alertManagerId, silence } = body as {
-    alertManagerId: string;
-    silence: SilencePayload;
-  };
+  const { alertManagerId, silence } = body as { alertManagerId: string; silence: SilencePayload };
 
   if (!alertManagerId || !silence) {
     return NextResponse.json({ error: 'alertManagerId and silence are required' }, { status: 400 });
   }
 
-  const alertManagers = getAlertManagers();
+  const [alertManagers, config] = await Promise.all([getAlertManagers(), getConfig()]);
   const am = alertManagers.find((a) => a.id === alertManagerId);
-  if (!am) {
-    return NextResponse.json({ error: 'AlertManager not found' }, { status: 404 });
-  }
+  if (!am) return NextResponse.json({ error: 'AlertManager not found' }, { status: 404 });
 
-  const config = getConfig();
   const proxy = resolveProxy(am, config);
-
   try {
     const result = await createSilence(am.url, silence, proxy);
     return NextResponse.json(result);

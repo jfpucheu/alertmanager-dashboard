@@ -2,11 +2,10 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   output: 'standalone',
-  // Explicitly expose env vars to the Edge Runtime (middleware).
-  // process.env from .env.local is read here at startup, then inlined.
-  env: {
-    LDAP_ENABLED: process.env.LDAP_ENABLED ?? '',
-  },
+  // With output: 'standalone', the middleware runs in Node.js (not true Edge),
+  // so process.env reads runtime env vars from the pod directly.
+  // Do NOT inline env vars here — that would bake them in at build time and
+  // override whatever the pod sets at runtime.
   turbopack: {
     root: __dirname,
   },

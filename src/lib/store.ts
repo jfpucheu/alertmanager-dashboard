@@ -1,61 +1,44 @@
-import fs from 'fs';
-import path from 'path';
 import { AlertManager, GlobalConfig, Assignment, AssignmentMap } from '@/types/alertmanager';
-import { isInCluster, getConfigMapData, setConfigMapKey } from '@/lib/k8s';
+import { getStorageBackend } from '@/lib/storage';
 
-// ── Storage abstraction ────────────────────────────────────────
-// In-cluster  → Kubernetes ConfigMap (data stored in etcd)
-// Local dev   → JSON files under /data
+// ── AlertManager input type ────────────────────────────────────
 
-const DATA_DIR = path.join(process.cwd(), 'data');
-const FILES = {
-  alertmanagers: path.join(DATA_DIR, 'alertmanagers.json'),
-  config:        path.join(DATA_DIR, 'config.json'),
-  assignments:   path.join(DATA_DIR, 'assignments.json'),
-};
-
-function ensureDataDir() {
-  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-}
-
-// ── Generic read/write ─────────────────────────────────────────
-
-async function readKey<T>(key: string, fallback: T): Promise<T> {
-  if (isInCluster()) {
-    const data = await getConfigMapData();
-    if (!data[key]) return fallback;
-    try { return JSON.parse(data[key]); } catch { return fallback; }
-  }
-  ensureDataDir();
-  const file = FILES[key as keyof typeof FILES];
-  if (!file || !fs.existsSync(file)) return fallback;
-  try { return JSON.parse(fs.readFileSync(file, 'utf-8')); } catch { return fallback; }
-}
-
-async function writeKey<T>(key: string, value: T): Promise<void> {
-  const json = JSON.stringify(value, null, 2);
-  if (isInCluster()) {
-    await setConfigMapKey(key, json);
-    return;
-  }
-  ensureDataDir();
-  const file = FILES[key as keyof typeof FILES];
-  if (file) fs.writeFileSync(file, json);
-}
-
-// ── AlertManagers ──────────────────────────────────────────────
-
-export async function getAlertManagers(): Promise<AlertManager[]> {
-  return readKey<AlertManager[]>('alertmanagers', []);
-}
-
-export async function addAlertManager(data: {
+export interface AlertManagerInput {
   name: string;
   url: string;
   proxy?: string;
   noProxy?: boolean;
   insecure?: boolean;
-}): Promise<AlertManager> {
+}
+
+// ── Validation ─────────────────────────────────────────────────
+
+export interface ValidationError {
+  field: string;
+  message: string;
+}
+
+export function validateAlertManagerInput(data: AlertManagerInput): ValidationError | null {
+  if (!data.name?.trim()) return { field: 'name', message: 'name is required' };
+  if (!data.url?.trim()) return { field: 'url', message: 'url is required' };
+  try { new URL(data.url); } catch {
+    return { field: 'url', message: 'Invalid URL format' };
+  }
+  if (data.proxy) {
+    try { new URL(data.proxy); } catch {
+      return { field: 'proxy', message: 'Invalid proxy URL format' };
+    }
+  }
+  return null;
+}
+
+// ── AlertManagers ──────────────────────────────────────────────
+
+export async function getAlertManagers(): Promise<AlertManager[]> {
+  return getStorageBackend().get<AlertManager[]>('alertmanagers', []);
+}
+
+export async function addAlertManager(data: AlertManagerInput): Promise<AlertManager> {
   const list = await getAlertManagers();
   const newAM: AlertManager = {
     id: crypto.randomUUID(),
@@ -67,17 +50,11 @@ export async function addAlertManager(data: {
     ...(data.insecure ? { insecure: true } : {}),
   };
   list.push(newAM);
-  await writeKey('alertmanagers', list);
+  await getStorageBackend().set('alertmanagers', list);
   return newAM;
 }
 
-export async function updateAlertManager(id: string, data: {
-  name: string;
-  url: string;
-  proxy?: string;
-  noProxy?: boolean;
-  insecure?: boolean;
-}): Promise<AlertManager | null> {
+export async function updateAlertManager(id: string, data: AlertManagerInput): Promise<AlertManager | null> {
   const list = await getAlertManagers();
   const idx = list.findIndex((am) => am.id === id);
   if (idx === -1) return null;
@@ -90,7 +67,7 @@ export async function updateAlertManager(id: string, data: {
     insecure: data.insecure || undefined,
   };
   list[idx] = updated;
-  await writeKey('alertmanagers', list);
+  await getStorageBackend().set('alertmanagers', list);
   return updated;
 }
 
@@ -98,24 +75,24 @@ export async function removeAlertManager(id: string): Promise<boolean> {
   const list = await getAlertManagers();
   const filtered = list.filter((am) => am.id !== id);
   if (filtered.length === list.length) return false;
-  await writeKey('alertmanagers', filtered);
+  await getStorageBackend().set('alertmanagers', filtered);
   return true;
 }
 
 // ── Global config ──────────────────────────────────────────────
 
 export async function getConfig(): Promise<GlobalConfig> {
-  return readKey<GlobalConfig>('config', {});
+  return getStorageBackend().get<GlobalConfig>('config', {});
 }
 
 export async function saveConfig(config: GlobalConfig): Promise<void> {
-  await writeKey('config', config);
+  await getStorageBackend().set('config', config);
 }
 
 // ── Assignments ────────────────────────────────────────────────
 
 export async function getAssignments(): Promise<AssignmentMap> {
-  return readKey<AssignmentMap>('assignments', {});
+  return getStorageBackend().get<AssignmentMap>('assignments', {});
 }
 
 export async function setAssignment(amId: string, fingerprint: string, name: string): Promise<Assignment> {
@@ -123,7 +100,7 @@ export async function setAssignment(amId: string, fingerprint: string, name: str
   const key = `${amId}::${fingerprint}`;
   const assignment: Assignment = { key, name, assignedAt: new Date().toISOString() };
   map[key] = assignment;
-  await writeKey('assignments', map);
+  await getStorageBackend().set('assignments', map);
   return assignment;
 }
 
@@ -132,7 +109,7 @@ export async function removeAssignment(amId: string, fingerprint: string): Promi
   const key = `${amId}::${fingerprint}`;
   if (!map[key]) return false;
   delete map[key];
-  await writeKey('assignments', map);
+  await getStorageBackend().set('assignments', map);
   return true;
 }
 

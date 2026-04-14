@@ -30,7 +30,7 @@ function readNamespace(): string {
 
 const CONFIGMAP_NAME = process.env.K8S_CONFIGMAP_NAME ?? 'alertmanager-dashboard';
 
-function k8sRequest(method: string, path: string, body?: object): Promise<Record<string, unknown>> {
+function k8sRequest(method: string, path: string, body?: object): Promise<{ status: number; body: Record<string, unknown> }> {
   return new Promise((resolve, reject) => {
     const token = readToken();
     const data = body ? JSON.stringify(body) : undefined;
@@ -51,11 +51,14 @@ function k8sRequest(method: string, path: string, body?: object): Promise<Record
       let raw = '';
       res.on('data', (c) => (raw += c));
       res.on('end', () => {
-        try {
-          resolve(JSON.parse(raw));
-        } catch {
-          resolve({});
+        const statusCode = res.statusCode ?? 0;
+        let parsed: Record<string, unknown> = {};
+        try { parsed = JSON.parse(raw); } catch { /* keep empty */ }
+        if (statusCode >= 400) {
+          reject(new Error(`K8s API error ${statusCode}: ${raw}`));
+          return;
         }
+        resolve({ status: statusCode, body: parsed });
       });
     });
     req.on('error', reject);
@@ -71,8 +74,8 @@ function cmPath(namespace: string) {
 /** Fetch all keys from the ConfigMap's data field. */
 export async function getConfigMapData(): Promise<Record<string, string>> {
   const ns = readNamespace();
-  const cm = await k8sRequest('GET', cmPath(ns));
-  return (cm.data as Record<string, string>) ?? {};
+  const { body } = await k8sRequest('GET', cmPath(ns));
+  return (body.data as Record<string, string>) ?? {};
 }
 
 /** Patch a single key in the ConfigMap (creates the CM if it doesn't exist). */
@@ -88,9 +91,15 @@ export async function setConfigMapKey(key: string, value: string): Promise<void>
     data: { [key]: value },
   };
 
-  const result = await k8sRequest('PATCH', path, patch).catch(() => null);
-  // If 404, create the ConfigMap
-  if (!result || (result as { code?: number }).code === 404) {
-    await k8sRequest('POST', `/api/v1/namespaces/${ns}/configmaps`, patch);
+  try {
+    await k8sRequest('PATCH', path, patch);
+  } catch (err) {
+    // PATCH returns 404 when the ConfigMap doesn't exist yet → create it
+    const msg = err instanceof Error ? err.message : '';
+    if (msg.includes('404')) {
+      await k8sRequest('POST', `/api/v1/namespaces/${ns}/configmaps`, patch);
+    } else {
+      throw err;
+    }
   }
 }

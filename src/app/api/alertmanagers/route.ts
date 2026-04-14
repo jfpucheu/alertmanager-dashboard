@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAlertManagers, addAlertManager, updateAlertManager, removeAlertManager } from '@/lib/store';
+import { getAlertManagers, addAlertManager, updateAlertManager, removeAlertManager, validateAlertManagerInput } from '@/lib/store';
 
 export async function GET() {
   return NextResponse.json(await getAlertManagers());
@@ -8,17 +8,9 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const body = await req.json();
   const { name, url, proxy, noProxy, insecure } = body;
-  if (!name || !url) {
-    return NextResponse.json({ error: 'name and url are required' }, { status: 400 });
-  }
-  try { new URL(url); } catch {
-    return NextResponse.json({ error: 'Invalid URL format' }, { status: 400 });
-  }
-  if (proxy) {
-    try { new URL(proxy); } catch {
-      return NextResponse.json({ error: 'Invalid proxy URL format' }, { status: 400 });
-    }
-  }
+  const err = validateAlertManagerInput({ name, url, proxy, noProxy, insecure });
+  if (err) return NextResponse.json({ error: err.message }, { status: 400 });
+
   const am = await addAlertManager({ name, url, proxy: proxy || undefined, noProxy: !!noProxy, insecure: !!insecure });
   return NextResponse.json(am, { status: 201 });
 }
@@ -30,15 +22,9 @@ export async function PATCH(req: NextRequest) {
 
   const body = await req.json();
   const { name, url, proxy, noProxy, insecure } = body;
-  if (!name || !url) return NextResponse.json({ error: 'name and url are required' }, { status: 400 });
-  try { new URL(url); } catch {
-    return NextResponse.json({ error: 'Invalid URL format' }, { status: 400 });
-  }
-  if (proxy) {
-    try { new URL(proxy); } catch {
-      return NextResponse.json({ error: 'Invalid proxy URL format' }, { status: 400 });
-    }
-  }
+  const err = validateAlertManagerInput({ name, url, proxy, noProxy, insecure });
+  if (err) return NextResponse.json({ error: err.message }, { status: 400 });
+
   const am = await updateAlertManager(id, { name, url, proxy: proxy || undefined, noProxy: !!noProxy, insecure: !!insecure });
   if (!am) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   return NextResponse.json(am);

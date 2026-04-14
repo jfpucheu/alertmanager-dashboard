@@ -29,7 +29,8 @@ export default function HomePage() {
   const [selectedAmId, setSelectedAmId] = useState<string>('');
   const [alertnameFilter, setAlertnameFilter] = useState('');
   const refreshInterval = useRefreshInterval();
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const intervalRef     = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isFirstLoad     = useRef(true);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -39,12 +40,25 @@ export default function HomePage() {
     const ams: AlertManager[] = await amsRes.json();
     setAlertManagers(ams);
     setAssignments(await assignRes.json());
-
-    // 2. Seed UI immediately with loading placeholders
-    setData(ams.map((am) => ({ alertManager: am, alerts: [], severityCounts: { ...EMPTY_COUNTS }, reachable: false, loading: true })));
     setLoading(false);
 
-    // 3. Fetch each AM independently — update state as each responds
+    // 2. First load → show placeholders so the layout doesn't jump.
+    //    Subsequent refreshes → keep existing data visible (no flash).
+    if (isFirstLoad.current) {
+      isFirstLoad.current = false;
+      setData(ams.map((am) => ({ alertManager: am, alerts: [], severityCounts: { ...EMPTY_COUNTS }, reachable: false, loading: true })));
+    } else {
+      // Preserve stale data; only add placeholders for newly added AMs
+      setData((prev) => {
+        const keep = prev.filter((d) => ams.some((am) => am.id === d.alertManager.id));
+        const added = ams
+          .filter((am) => !prev.some((d) => d.alertManager.id === am.id))
+          .map((am) => ({ alertManager: am, alerts: [], severityCounts: { ...EMPTY_COUNTS }, reachable: false, loading: true }));
+        return [...keep, ...added];
+      });
+    }
+
+    // 3. Fetch each AM independently — silently swap in fresh data
     await Promise.allSettled(
       ams.map(async (am) => {
         try {
@@ -53,7 +67,7 @@ export default function HomePage() {
           const result = results[0];
           if (result) setData((prev) => prev.map((d) => d.alertManager.id === am.id ? { ...result, loading: false } : d));
         } catch {
-          setData((prev) => prev.map((d) => d.alertManager.id === am.id ? { ...d, reachable: false, loading: false, error: 'Network error' } : d));
+          setData((prev) => prev.map((d) => d.alertManager.id === am.id ? { ...d, loading: false } : d));
         }
       }),
     );

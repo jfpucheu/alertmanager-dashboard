@@ -33,7 +33,8 @@ export default function SilencesPage() {
   const [extending, setExtending] = useState<string | null>(null);
   const [showExpired, setShowExpired] = useState(false);
   const refreshInterval = useRefreshInterval();
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const intervalRef     = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isFirstLoad     = useRef(true);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -42,12 +43,23 @@ export default function SilencesPage() {
     const amsRes = await fetch('/api/alertmanagers');
     const ams: AlertManager[] = await amsRes.json();
     setAlertManagers(ams);
-
-    // 2. Seed UI with loading placeholders
-    setData(ams.map((am) => ({ alertManager: am, silences: [], reachable: false, loading: true })));
     setLoading(false);
 
-    // 3. Fetch each AM independently
+    // 2. First load → placeholders. Subsequent refreshes → keep stale data visible.
+    if (isFirstLoad.current) {
+      isFirstLoad.current = false;
+      setData(ams.map((am) => ({ alertManager: am, silences: [], reachable: false, loading: true })));
+    } else {
+      setData((prev) => {
+        const keep = prev.filter((d) => ams.some((am) => am.id === d.alertManager.id));
+        const added = ams
+          .filter((am) => !prev.some((d) => d.alertManager.id === am.id))
+          .map((am) => ({ alertManager: am, silences: [], reachable: false, loading: true }));
+        return [...keep, ...added];
+      });
+    }
+
+    // 3. Fetch each AM independently — silently swap in fresh data
     await Promise.allSettled(
       ams.map(async (am) => {
         try {
@@ -56,7 +68,7 @@ export default function SilencesPage() {
           const result = results[0];
           if (result) setData((prev) => prev.map((d) => d.alertManager.id === am.id ? { ...result, loading: false } : d));
         } catch {
-          setData((prev) => prev.map((d) => d.alertManager.id === am.id ? { ...d, reachable: false, loading: false, error: 'Network error' } : d));
+          setData((prev) => prev.map((d) => d.alertManager.id === am.id ? { ...d, loading: false } : d));
         }
       }),
     );

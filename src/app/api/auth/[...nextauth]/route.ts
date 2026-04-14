@@ -20,18 +20,22 @@ export const authOptions: NextAuthOptions = {
         if (!ldapConfig) return null;
         const user = await authenticateLDAP(ldapConfig, credentials.username, credentials.password);
         if (!user) return null;
-        return { id: user.username, name: user.displayName, email: null };
+        return { id: user.username, name: user.displayName, email: null, givenName: user.givenName };
       },
     }),
   ],
   callbacks: {
     async jwt({ token, user }) {
-      if (user) token.username = user.id;
+      if (user) {
+        token.username = user.id;
+        token.givenName = (user as { givenName?: string }).givenName ?? '';
+      }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
-        (session.user as { username?: string }).username = token.username as string;
+        (session.user as { username?: string; givenName?: string }).username = token.username as string;
+        (session.user as { username?: string; givenName?: string }).givenName = token.givenName as string;
       }
       return session;
     },

@@ -39,6 +39,7 @@ export function getLdapConfig(stored?: LdapConfig): LdapConfig | null {
 export interface LdapUser {
   username: string;
   displayName: string;
+  givenName: string;
 }
 
 export async function authenticateLDAP(
@@ -57,7 +58,7 @@ export async function authenticateLDAP(
     const { searchEntries } = await serviceClient.search(config.searchBase, {
       scope: 'sub',
       filter,
-      attributes: ['dn', config.displayNameAttr || 'cn'],
+      attributes: ['dn', config.displayNameAttr || 'cn', 'givenName'],
     });
     await serviceClient.unbind();
 
@@ -66,13 +67,15 @@ export async function authenticateLDAP(
     const userDN = searchEntries[0].dn;
     const rawName = searchEntries[0][config.displayNameAttr || 'cn'];
     const displayName = Array.isArray(rawName) ? String(rawName[0]) : String(rawName || username);
+    const rawGivenName = searchEntries[0]['givenName'];
+    const givenName = Array.isArray(rawGivenName) ? String(rawGivenName[0]) : String(rawGivenName || '');
 
     // 2. Try to bind as the user to verify password
     const userClient = new Client({ url: config.url, tlsOptions: { rejectUnauthorized: false } });
     try {
       await userClient.bind(userDN, password);
       await userClient.unbind();
-      return { username, displayName };
+      return { username, displayName, givenName };
     } catch {
       return null;
     }

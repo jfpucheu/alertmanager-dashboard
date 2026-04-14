@@ -65,6 +65,7 @@ Copy `.env.local.example` to `.env.local` and fill in the values:
 | `LDAP_SEARCH_BASE` | No | Base DN for user search — overrides UI setting |
 | `LDAP_SEARCH_FILTER` | No | Search filter (`{{username}}` placeholder) — overrides UI setting |
 | `LDAP_DISPLAY_ATTR` | No | Display name attribute (default: `cn`) — overrides UI setting |
+| `API_KEY` | No | Static key for programmatic API access — bypasses LDAP (see below) |
 
 ### Storage
 
@@ -129,6 +130,41 @@ Then in `k8s/deployment.yaml`:
 - Successful login creates a JWT session (stored in a cookie)
 - **Assignments**: clicking "+ Affecter" instantly assigns the alert to the logged-in user (no manual input)
 - **Session info**: the logged-in username is displayed in Settings with a logout button
+
+---
+
+## API Key — Programmatic Access
+
+When `LDAP_ENABLED=true`, all routes are protected. To call the API from scripts or pipelines without a browser session, set an `API_KEY` environment variable and include it in requests.
+
+```bash
+# Generate a key
+openssl rand -hex 32
+
+# Set in your environment / k8s Secret
+API_KEY=<generated-key>
+```
+
+Pass the key in one of two ways:
+
+```bash
+# Option A — Authorization header
+curl -H "Authorization: Bearer <key>" https://dashboard.example.com/api/alertmanagers
+
+# Option B — X-Api-Key header
+curl -H "X-Api-Key: <key>" https://dashboard.example.com/api/alertmanagers
+```
+
+Example — add an AlertManager from a script:
+
+```bash
+curl -s -X POST https://dashboard.example.com/api/alertmanagers \
+  -H "Authorization: Bearer <key>" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Production", "url": "http://alertmanager:9093"}'
+```
+
+> If `API_KEY` is not set, the bypass is disabled and only LDAP sessions are accepted.
 
 ---
 

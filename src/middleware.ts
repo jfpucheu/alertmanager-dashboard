@@ -15,6 +15,16 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
+  // API key bypass — allows programmatic access without LDAP
+  const apiKey = process.env.API_KEY;
+  if (apiKey) {
+    const authHeader = req.headers.get('authorization') ?? '';
+    const keyHeader  = req.headers.get('x-api-key') ?? '';
+    if (authHeader === `Bearer ${apiKey}` || keyHeader === apiKey) {
+      return NextResponse.next();
+    }
+  }
+
   // LDAP is enabled — require a valid session
   try {
     const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });

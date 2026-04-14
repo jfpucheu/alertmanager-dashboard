@@ -39,6 +39,13 @@ spec:
                   key: secret
             - name: NEXTAUTH_URL
               value: "https://your-dashboard-url"
+            # Optional: static API key for programmatic access (bypasses LDAP)
+            # Generate with: openssl rand -hex 32
+            # - name: API_KEY
+            #   valueFrom:
+            #     secretKeyRef:
+            #       name: alertmanager-dashboard-auth
+            #       key: api-key
           resources:
             requests:
               cpu: 50m

@@ -2,11 +2,10 @@
 
 import { useState } from 'react';
 import { signIn } from 'next-auth/react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 
 function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get('callbackUrl') ?? '/';
 
@@ -28,8 +27,9 @@ function LoginForm() {
     if (result?.error) {
       setError('Identifiants invalides');
     } else {
-      router.push(callbackUrl);
-      router.refresh();
+      // Use window.location for absolute callbackUrls (e.g. https://host/path)
+      // router.push() only handles relative paths correctly
+      window.location.href = callbackUrl;
     }
   }
 

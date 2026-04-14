@@ -30,6 +30,8 @@ export interface GlobalConfig {
   ldap?: LdapConfig;
   title?: string;
   logoUrl?: string;
+  /** Auto-refresh interval in milliseconds. 0 = disabled. Default: 30000. */
+  refreshInterval?: number;
 }
 
 export interface AlertLabel {

@@ -16,6 +16,15 @@ const THEMES = [
   { value: 'system', label: 'System', icon: '💻' },
 ];
 
+const REFRESH_OPTIONS = [
+  { label: '10 secondes',  value: 10_000 },
+  { label: '30 secondes', value: 30_000 },
+  { label: '1 minute',    value: 60_000 },
+  { label: '2 minutes',   value: 120_000 },
+  { label: '5 minutes',   value: 300_000 },
+  { label: 'Désactivé',   value: 0 },
+];
+
 
 export default function SettingsModal({ onClose, onBrandingChanged }: SettingsModalProps) {
   const { theme, setTheme } = useTheme();
@@ -25,6 +34,7 @@ export default function SettingsModal({ onClose, onBrandingChanged }: SettingsMo
   const [proxy, setProxy] = useState('');
   const [appTitle, setAppTitle] = useState('');
   const [logoUrl, setLogoUrl] = useState('');
+  const [refreshInterval, setRefreshInterval] = useState(30_000);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -37,6 +47,7 @@ export default function SettingsModal({ onClose, onBrandingChanged }: SettingsMo
         setProxy(config.proxy ?? '');
         setAppTitle(config.title ?? '');
         setLogoUrl(config.logoUrl ?? '');
+        setRefreshInterval(config.refreshInterval ?? 30_000);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -51,6 +62,7 @@ export default function SettingsModal({ onClose, onBrandingChanged }: SettingsMo
         proxy: proxy.trim() || undefined,
         title: appTitle.trim() || undefined,
         logoUrl: logoUrl.trim() || undefined,
+        refreshInterval,
       };
       if (body.proxy) {
         try { new URL(body.proxy); } catch {
@@ -179,6 +191,24 @@ export default function SettingsModal({ onClose, onBrandingChanged }: SettingsMo
                 <p className="text-gray-500 text-xs mt-1.5">
                   Appliqué à tous les AlertManagers sauf surcharge par instance.
                 </p>
+              </div>
+
+              <div className="border-t border-gray-200 dark:border-gray-700" />
+
+              {/* Refresh interval */}
+              <div>
+                <label className="block text-gray-700 dark:text-gray-300 text-sm font-medium mb-1">
+                  Fréquence de rafraîchissement
+                </label>
+                <select
+                  value={refreshInterval}
+                  onChange={(e) => setRefreshInterval(Number(e.target.value))}
+                  className="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {REFRESH_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
               </div>
 
               {error && <p className="text-red-500 text-sm">{error}</p>}

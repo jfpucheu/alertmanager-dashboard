@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { useRefreshInterval } from '@/hooks/useRefreshInterval';
 import AddAlertManagerModal from '@/components/AddAlertManagerModal';
 import SilenceModal from '@/components/SilenceModal';
 import { AlertManagerStatus, AlertManager, Alert, Severity, SEVERITIES, AssignmentMap } from '@/types/alertmanager';
@@ -39,6 +40,8 @@ export default function AlertManagersPage() {
   const [expandedAM, setExpandedAM] = useState<string | null>(null);
   const [assignments, setAssignments] = useState<AssignmentMap>({});
   const [alertnameFilter, setAlertnameFilter] = useState('');
+  const refreshInterval = useRefreshInterval();
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -54,9 +57,12 @@ export default function AlertManagersPage() {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 30000);
-    return () => clearInterval(interval);
-  }, [fetchData]);
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    if (refreshInterval > 0) {
+      intervalRef.current = setInterval(fetchData, refreshInterval);
+    }
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+  }, [fetchData, refreshInterval]);
 
   async function handleDelete(id: string) {
     if (!confirm('Remove this AlertManager?')) return;

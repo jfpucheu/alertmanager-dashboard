@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { useRefreshInterval } from '@/hooks/useRefreshInterval';
 import SilenceModal from '@/components/SilenceModal';
 import { AMSilences, AlertManager, Silence } from '@/types/alertmanager';
 
@@ -31,6 +32,8 @@ export default function SilencesPage() {
   const [expiring, setExpiring] = useState<string | null>(null);
   const [extending, setExtending] = useState<string | null>(null);
   const [showExpired, setShowExpired] = useState(false);
+  const refreshInterval = useRefreshInterval();
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -46,9 +49,12 @@ export default function SilencesPage() {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 30000);
-    return () => clearInterval(interval);
-  }, [fetchData]);
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    if (refreshInterval > 0) {
+      intervalRef.current = setInterval(fetchData, refreshInterval);
+    }
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+  }, [fetchData, refreshInterval]);
 
   async function handleExtend(amId: string, silence: Silence, extraMs: number) {
     setExtending(silence.id);

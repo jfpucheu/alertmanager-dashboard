@@ -8,7 +8,7 @@ export async function GET() {
 
 export async function PUT(req: NextRequest) {
   const body: GlobalConfig = await req.json();
-  const { proxy, ldap } = body;
+  const { proxy, ldap, title, logoUrl, refreshInterval } = body;
 
   if (proxy) {
     try { new URL(proxy); } catch {
@@ -23,8 +23,11 @@ export async function PUT(req: NextRequest) {
   }
 
   const config = await getConfig();
-  config.proxy = proxy || undefined;
-  config.ldap = ldap?.url ? ldap : undefined;
+  config.proxy           = proxy || undefined;
+  config.ldap            = ldap?.url ? ldap : undefined;
+  config.title           = title || undefined;
+  config.logoUrl         = logoUrl || undefined;
+  config.refreshInterval = typeof refreshInterval === 'number' ? refreshInterval : undefined;
   await saveConfig(config);
   return NextResponse.json(config);
 }

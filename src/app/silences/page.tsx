@@ -37,14 +37,31 @@ export default function SilencesPage() {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    try {
-      const [silencesRes, amsRes] = await Promise.all([fetch('/api/silences'), fetch('/api/alertmanagers')]);
-      setData(await silencesRes.json());
-      setAlertManagers(await amsRes.json());
-      setLastRefresh(new Date());
-    } finally {
-      setLoading(false);
-    }
+
+    // 1. AM list — fast (local store)
+    const amsRes = await fetch('/api/alertmanagers');
+    const ams: AlertManager[] = await amsRes.json();
+    setAlertManagers(ams);
+
+    // 2. Seed UI with loading placeholders
+    setData(ams.map((am) => ({ alertManager: am, silences: [], reachable: false, loading: true })));
+    setLoading(false);
+
+    // 3. Fetch each AM independently
+    await Promise.allSettled(
+      ams.map(async (am) => {
+        try {
+          const res = await fetch(`/api/silences?amId=${am.id}`);
+          const results: AMSilences[] = await res.json();
+          const result = results[0];
+          if (result) setData((prev) => prev.map((d) => d.alertManager.id === am.id ? { ...result, loading: false } : d));
+        } catch {
+          setData((prev) => prev.map((d) => d.alertManager.id === am.id ? { ...d, reachable: false, loading: false, error: 'Network error' } : d));
+        }
+      }),
+    );
+
+    setLastRefresh(new Date());
   }, []);
 
   useEffect(() => {
@@ -94,6 +111,7 @@ export default function SilencesPage() {
   const expired = filtered.filter((fs) => fs.silence.status.state === 'expired' && matchesSearch(fs, search));
 
   const reachableCount = data.filter((d) => d.reachable).length;
+  const loadingCount   = data.filter((d) => d.loading).length;
 
   return (
     <div className="flex-1 p-6 space-y-5">
@@ -102,7 +120,9 @@ export default function SilencesPage() {
         <div>
           <h1 className="text-gray-900 dark:text-white text-2xl font-bold">Silences</h1>
           <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
-            {reachableCount}/{data.length} AlertManagers reachable
+            {loadingCount > 0
+              ? `${data.length - loadingCount}/${data.length} AlertManagers chargés…`
+              : `${reachableCount}/${data.length} AlertManagers reachable`}
             {lastRefresh && (
               <span className="ml-3 text-gray-400 dark:text-gray-500">
                 Last refresh: {lastRefresh.toLocaleTimeString()}

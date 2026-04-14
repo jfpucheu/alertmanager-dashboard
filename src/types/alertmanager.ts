@@ -66,6 +66,7 @@ export interface AlertManagerStatus {
   alerts: Alert[];
   severityCounts: SeverityCounts;
   reachable: boolean;
+  loading?: boolean;
   error?: string;
 }
 
@@ -100,6 +101,7 @@ export interface AMSilences {
   alertManager: AlertManager;
   silences: Silence[];
   reachable: boolean;
+  loading?: boolean;
   error?: string;
 }
 

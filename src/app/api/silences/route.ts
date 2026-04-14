@@ -3,10 +3,13 @@ import { getAlertManagers, getConfig, resolveProxy } from '@/lib/store';
 import { fetchSilences, createSilence, expireSilence, extendSilence } from '@/lib/alertmanager';
 import { SilencePayload, AMSilences, Silence } from '@/types/alertmanager';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const amId = new URL(req.url).searchParams.get('amId');
   const [alertManagers, config] = await Promise.all([getAlertManagers(), getConfig()]);
+  const targets = amId ? alertManagers.filter((am) => am.id === amId) : alertManagers;
+
   const results: AMSilences[] = await Promise.all(
-    alertManagers.map(async (am) => {
+    targets.map(async (am) => {
       const proxy = resolveProxy(am, config);
       try {
         const silences = await fetchSilences(am.url, proxy, am.insecure);

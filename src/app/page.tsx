@@ -33,15 +33,32 @@ export default function HomePage() {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    try {
-      const [alertsRes, amsRes, assignRes] = await Promise.all([fetch('/api/alerts'), fetch('/api/alertmanagers'), fetch('/api/assignments')]);
-      setData(await alertsRes.json());
-      setAlertManagers(await amsRes.json());
-      setAssignments(await assignRes.json());
-      setLastRefresh(new Date());
-    } finally {
-      setLoading(false);
-    }
+
+    // 1. AM list + assignments — fast (local store, no network to alertmanagers)
+    const [amsRes, assignRes] = await Promise.all([fetch('/api/alertmanagers'), fetch('/api/assignments')]);
+    const ams: AlertManager[] = await amsRes.json();
+    setAlertManagers(ams);
+    setAssignments(await assignRes.json());
+
+    // 2. Seed UI immediately with loading placeholders
+    setData(ams.map((am) => ({ alertManager: am, alerts: [], severityCounts: { ...EMPTY_COUNTS }, reachable: false, loading: true })));
+    setLoading(false);
+
+    // 3. Fetch each AM independently — update state as each responds
+    await Promise.allSettled(
+      ams.map(async (am) => {
+        try {
+          const res = await fetch(`/api/alerts?amId=${am.id}`);
+          const results: AlertManagerStatus[] = await res.json();
+          const result = results[0];
+          if (result) setData((prev) => prev.map((d) => d.alertManager.id === am.id ? { ...result, loading: false } : d));
+        } catch {
+          setData((prev) => prev.map((d) => d.alertManager.id === am.id ? { ...d, reachable: false, loading: false, error: 'Network error' } : d));
+        }
+      }),
+    );
+
+    setLastRefresh(new Date());
   }, []);
 
   useEffect(() => {
@@ -66,6 +83,7 @@ export default function HomePage() {
 
   const totalAlerts = SEVERITIES.reduce((sum, s) => sum + totals[s], 0);
   const reachableCount = data.filter((d) => d.reachable).length;
+  const loadingCount   = data.filter((d) => d.loading).length;
 
   function toggleSeverity(s: Severity) {
     setExpandedSeverities((prev) => {
@@ -82,7 +100,9 @@ export default function HomePage() {
         <div>
           <h1 className="text-gray-900 dark:text-white text-2xl font-bold">Overview</h1>
           <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
-            {reachableCount}/{data.length} AlertManagers reachable
+            {loadingCount > 0
+              ? `${data.length - loadingCount}/${data.length} AlertManagers chargés…`
+              : `${reachableCount}/${data.length} AlertManagers reachable`}
             {lastRefresh && (
               <span className="ml-3 text-gray-400 dark:text-gray-500">
                 Last refresh: {lastRefresh.toLocaleTimeString()}

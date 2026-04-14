@@ -45,14 +45,30 @@ export default function AlertManagersPage() {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    try {
-      const [alertsRes, amsRes, assignRes] = await Promise.all([fetch('/api/alerts'), fetch('/api/alertmanagers'), fetch('/api/assignments')]);
-      setData(await alertsRes.json());
-      setAlertManagers(await amsRes.json());
-      setAssignments(await assignRes.json());
-    } finally {
-      setLoading(false);
-    }
+
+    // 1. AM list + assignments — fast (local store)
+    const [amsRes, assignRes] = await Promise.all([fetch('/api/alertmanagers'), fetch('/api/assignments')]);
+    const ams: AlertManager[] = await amsRes.json();
+    setAlertManagers(ams);
+    setAssignments(await assignRes.json());
+
+    // 2. Seed UI with loading placeholders
+    setData(ams.map((am) => ({ alertManager: am, alerts: [], severityCounts: { critical: 0, error: 0, warning: 0, info: 0, none: 0 }, reachable: false, loading: true })));
+    setLoading(false);
+
+    // 3. Fetch each AM independently
+    await Promise.allSettled(
+      ams.map(async (am) => {
+        try {
+          const res = await fetch(`/api/alerts?amId=${am.id}`);
+          const results: AlertManagerStatus[] = await res.json();
+          const result = results[0];
+          if (result) setData((prev) => prev.map((d) => d.alertManager.id === am.id ? { ...result, loading: false } : d));
+        } catch {
+          setData((prev) => prev.map((d) => d.alertManager.id === am.id ? { ...d, reachable: false, loading: false, error: 'Network error' } : d));
+        }
+      }),
+    );
   }, []);
 
   useEffect(() => {
@@ -111,11 +127,14 @@ export default function AlertManagersPage() {
           <div key={item.alertManager.id} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4">
               <div className="flex items-center gap-3 min-w-0">
-                <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${item.reachable ? 'bg-green-500' : 'bg-red-500'}`} />
+                <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${item.loading ? 'bg-gray-400 animate-pulse' : item.reachable ? 'bg-green-500' : 'bg-red-500'}`} />
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="text-gray-900 dark:text-white font-semibold">{item.alertManager.name}</span>
-                    {!item.reachable && (
+                    {item.loading && (
+                      <span className="text-xs text-gray-400 dark:text-gray-500 animate-pulse">Connexion…</span>
+                    )}
+                    {!item.loading && !item.reachable && (
                       <span className="text-xs bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300 px-2 py-0.5 rounded">Unreachable</span>
                     )}
                     <ProxyBadge am={item.alertManager} />
@@ -128,7 +147,12 @@ export default function AlertManagersPage() {
               </div>
 
               <div className="flex items-center gap-3 shrink-0">
-                {item.reachable && (
+                {item.loading && (
+                  <div className="flex gap-1.5">
+                    {SEVERITIES.map((s) => <SeverityBadge key={s} severity={s} count={0} dim />)}
+                  </div>
+                )}
+                {!item.loading && item.reachable && (
                   <div className="flex gap-1.5">
                     {SEVERITIES.map((s) => (
                       <SeverityBadge key={s} severity={s} count={item.severityCounts[s]} />
@@ -136,7 +160,7 @@ export default function AlertManagersPage() {
                   </div>
                 )}
                 <div className="flex gap-2 ml-2">
-                  {item.reachable && item.alerts.length > 0 && (
+                  {!item.loading && item.reachable && item.alerts.length > 0 && (
                     <button
                       onClick={() => setExpandedAM(expandedAM === item.alertManager.id ? null : item.alertManager.id)}
                       className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white border border-gray-300 dark:border-gray-600 hover:border-gray-500 dark:hover:border-gray-400 px-2 py-1 rounded"
@@ -144,7 +168,7 @@ export default function AlertManagersPage() {
                       {expandedAM === item.alertManager.id ? 'Hide alerts' : `View ${item.alerts.length} alert${item.alerts.length > 1 ? 's' : ''}`}
                     </button>
                   )}
-                  {item.reachable && item.alerts.length > 0 && (
+                  {!item.loading && item.reachable && item.alerts.length > 0 && (
                     <button onClick={() => setSilenceContext({ am: item.alertManager, silenceAll: true })} className="text-xs text-orange-500 hover:text-orange-400 border border-orange-300 dark:border-orange-800 hover:border-orange-400 dark:hover:border-orange-600 px-2 py-1 rounded">
                       Silence all
                     </button>
@@ -222,7 +246,7 @@ export default function AlertManagersPage() {
   );
 }
 
-function SeverityBadge({ severity, count }: { severity: Severity; count: number }) {
+function SeverityBadge({ severity, count, dim }: { severity: Severity; count: number; dim?: boolean }) {
   const colors: Record<Severity, string> = {
     critical: 'bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300',
     error:    'bg-orange-100 dark:bg-orange-900 text-orange-600 dark:text-orange-300',
@@ -231,8 +255,8 @@ function SeverityBadge({ severity, count }: { severity: Severity; count: number 
     none:     'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400',
   };
   return (
-    <span className={`text-xs px-2 py-0.5 rounded font-medium ${colors[severity]} ${count === 0 ? 'opacity-30' : ''}`}>
-      {severity}: {count}
+    <span className={`text-xs px-2 py-0.5 rounded font-medium ${colors[severity]} ${count === 0 || dim ? 'opacity-30' : ''} ${dim ? 'animate-pulse' : ''}`}>
+      {severity}: {dim ? '…' : count}
     </span>
   );
 }

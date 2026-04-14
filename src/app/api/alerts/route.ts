@@ -1,13 +1,17 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getAlertManagers, getConfig, resolveProxy } from '@/lib/store';
 import { fetchAlerts, countBySeverity } from '@/lib/alertmanager';
 import { AlertManagerStatus } from '@/types/alertmanager';
 
-export async function GET() {
+const EMPTY = { critical: 0, error: 0, warning: 0, info: 0, none: 0 };
+
+export async function GET(req: NextRequest) {
+  const amId = new URL(req.url).searchParams.get('amId');
   const [alertManagers, config] = await Promise.all([getAlertManagers(), getConfig()]);
+  const targets = amId ? alertManagers.filter((am) => am.id === amId) : alertManagers;
 
   const results: AlertManagerStatus[] = await Promise.all(
-    alertManagers.map(async (am) => {
+    targets.map(async (am) => {
       const proxy = resolveProxy(am, config);
       try {
         const alerts = await fetchAlerts(am.url, proxy, am.insecure);
@@ -16,7 +20,7 @@ export async function GET() {
         return {
           alertManager: am,
           alerts: [],
-          severityCounts: { critical: 0, error: 0, warning: 0, info: 0, none: 0 },
+          severityCounts: { ...EMPTY },
           reachable: false,
           error: err instanceof Error ? err.message : 'Unknown error',
         };

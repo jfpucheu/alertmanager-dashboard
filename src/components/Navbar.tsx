@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
+import { useSession, signOut } from 'next-auth/react';
 import SettingsModal from '@/components/SettingsModal';
 import { GlobalConfig } from '@/types/alertmanager';
 
@@ -11,6 +12,8 @@ const DEFAULT_LOGO = '🔔';
 
 export default function Navbar() {
   const pathname = usePathname();
+  const { status } = useSession();
+  const isLdap = status === 'authenticated';
   const [showSettings, setShowSettings] = useState(false);
   const [title, setTitle] = useState(DEFAULT_TITLE);
   const [logoUrl, setLogoUrl] = useState('');
@@ -70,6 +73,18 @@ export default function Navbar() {
           </svg>
           Settings
         </button>
+        {isLdap && (
+          <button
+            onClick={() => signOut({ callbackUrl: '/login' })}
+            className="text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-800 px-3 py-1.5 rounded text-sm transition-colors flex items-center gap-1.5"
+            title="Déconnexion"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 001 1h7a1 1 0 000-2H4V5h6a1 1 0 000-2H3zm11.293 4.293a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 01-1.414-1.414L15.586 11H9a1 1 0 010-2h6.586l-1.293-1.293a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
+            Déconnexion
+          </button>
+        )}
       </nav>
 
       {showSettings && (

@@ -15,7 +15,8 @@ interface AssignCellProps {
 
 export default function AssignCell({ amId, fingerprint, assignment, onChanged }: AssignCellProps) {
   const { data: session } = useSession();
-  const sessionUsername = (session?.user as { username?: string })?.username ?? session?.user?.name ?? null;
+  const sessionUser = session?.user as { username?: string; givenName?: string; name?: string } | undefined;
+  const sessionUsername = sessionUser?.givenName || sessionUser?.username || sessionUser?.name || null;
 
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState('');

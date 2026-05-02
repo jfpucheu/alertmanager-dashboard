@@ -8,8 +8,9 @@ A central dashboard to monitor alerts from multiple [Prometheus Alertmanager](ht
 - **AlertManagers** — list instances with per-severity counts, expandable alert tables, add / edit / remove
 - **Silences** — list active and expired silences, create / expire / extend silences
 - **Assignments** — assign an alert to someone (persisted server-side)
-- **Proxy support** — global proxy or per-AlertManager override (custom / global / none)
-- **TLS** — optional per-AlertManager TLS certificate verification bypass
+- **Fetch mode** — per AlertManager : `server` (le serveur proxifie) ou `browser` (le navigateur appelle directement)
+- **Proxy support** — global proxy or per-AlertManager override (custom / global / none) — mode `server` only
+- **TLS** — optional per-AlertManager TLS certificate verification bypass — mode `server` only
 - **Branding** — custom title and logo in Settings
 - **LDAP authentication** — optional, configured via environment variables, enforced via `LDAP_ENABLED=true`
 - **Kubernetes storage** — data stored in a ConfigMap (etcd) when running in-cluster, JSON files otherwise
@@ -181,12 +182,39 @@ The RBAC grants the pod `get`, `patch`, `update`, and `create` on the `alertmana
 
 ---
 
+## Fetch Mode — Server vs Browser
+
+Each AlertManager has a `fetchMode` field that controls who makes the HTTP calls to the Alertmanager API.
+
+| Mode | Who calls alertmanager | Proxy support | TLS override | Requires |
+|------|----------------------|---------------|--------------|---------|
+| `server` (default) | Next.js server | ✅ | ✅ | Server → alertmanager network path |
+| `browser` | User's browser | ❌ | ❌ | Browser → alertmanager network path + CORS |
+
+### Browser mode — CORS configuration
+
+Alertmanager must be started with the `--web.cors.origin` flag set to the dashboard origin:
+
+```bash
+alertmanager --web.cors.origin='https://your-dashboard.example.com' ...
+```
+
+Or for local testing:
+
+```bash
+alertmanager --web.cors.origin='http://localhost:3000' ...
+```
+
+> Self-signed certificates must be trusted by the browser in browser mode — the server-side TLS bypass has no effect.
+
+---
+
 ## API Reference
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `GET` | `/api/alertmanagers` | List AlertManagers |
-| `POST` | `/api/alertmanagers` | Add AlertManager `{name, url, proxy?, noProxy?, insecure?}` |
+| `POST` | `/api/alertmanagers` | Add AlertManager `{name, url, fetchMode?, proxy?, noProxy?, insecure?}` |
 | `PATCH` | `/api/alertmanagers?id=` | Update AlertManager |
 | `DELETE` | `/api/alertmanagers?id=` | Remove AlertManager |
 | `GET` | `/api/alerts` | Active alerts from all AlertManagers |

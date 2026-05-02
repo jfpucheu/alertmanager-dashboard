@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { AlertManager, GlobalConfig, Assignment, AssignmentMap } from '@/types/alertmanager';
+import { AlertManager, FetchMode, GlobalConfig, Assignment, AssignmentMap } from '@/types/alertmanager';
 import { isInCluster, getConfigMapData, setConfigMapKey } from '@/lib/k8s';
 
 // ── Storage abstraction ────────────────────────────────────────
@@ -52,6 +52,7 @@ export async function getAlertManagers(): Promise<AlertManager[]> {
 export async function addAlertManager(data: {
   name: string;
   url: string;
+  fetchMode?: FetchMode;
   proxy?: string;
   noProxy?: boolean;
   insecure?: boolean;
@@ -62,6 +63,7 @@ export async function addAlertManager(data: {
     name: data.name,
     url: data.url.replace(/\/$/, ''),
     createdAt: new Date().toISOString(),
+    fetchMode: data.fetchMode ?? 'server',
     ...(data.proxy ? { proxy: data.proxy } : {}),
     ...(data.noProxy ? { noProxy: true } : {}),
     ...(data.insecure ? { insecure: true } : {}),
@@ -74,6 +76,7 @@ export async function addAlertManager(data: {
 export async function updateAlertManager(id: string, data: {
   name: string;
   url: string;
+  fetchMode?: FetchMode;
   proxy?: string;
   noProxy?: boolean;
   insecure?: boolean;
@@ -85,6 +88,7 @@ export async function updateAlertManager(id: string, data: {
     ...list[idx],
     name: data.name,
     url: data.url.replace(/\/$/, ''),
+    fetchMode: data.fetchMode ?? 'server',
     proxy: data.proxy || undefined,
     noProxy: data.noProxy || undefined,
     insecure: data.insecure || undefined,

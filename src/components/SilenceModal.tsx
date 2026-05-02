@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { AlertManager, Alert, SilenceMatcher } from '@/types/alertmanager';
+import { createSilenceDirect } from '@/lib/alertmanager-browser';
 
 interface SilenceModalProps {
   alertManagers: AlertManager[];
@@ -48,22 +49,25 @@ export default function SilenceModal({ alertManagers, preselectedAM, preselected
     setLoading(true);
     setError('');
     const now = Date.now();
+    const payload = {
+      matchers: validMatchers,
+      startsAt: new Date(now).toISOString(),
+      endsAt: new Date(now + parseDuration(duration)).toISOString(),
+      comment: comment || 'Created via dashboard',
+      createdBy,
+    };
+    const selectedAM = alertManagers.find((a) => a.id === selectedAMId);
     try {
-      const res = await fetch('/api/silences', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          alertManagerId: selectedAMId,
-          silence: {
-            matchers: validMatchers,
-            startsAt: new Date(now).toISOString(),
-            endsAt: new Date(now + parseDuration(duration)).toISOString(),
-            comment: comment || 'Created via dashboard',
-            createdBy,
-          },
-        }),
-      });
-      if (!res.ok) { const d = await res.json(); throw new Error(d.error ?? 'Failed'); }
+      if (selectedAM?.fetchMode === 'browser') {
+        await createSilenceDirect(selectedAM.url, payload);
+      } else {
+        const res = await fetch('/api/silences', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ alertManagerId: selectedAMId, silence: payload }),
+        });
+        if (!res.ok) { const d = await res.json(); throw new Error(d.error ?? 'Failed'); }
+      }
       onSuccess();
       onClose();
     } catch (err) {

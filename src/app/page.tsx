@@ -7,6 +7,7 @@ import SilenceModal from '@/components/SilenceModal';
 import { AlertManagerStatus, SeverityCounts, Severity, SEVERITIES, AlertManager, Alert, AssignmentMap } from '@/types/alertmanager';
 import { getSeverity } from '@/lib/severity';
 import AssignCell from '@/components/AssignCell';
+import { fetchAMAlerts } from '@/lib/fetch-am';
 
 const EMPTY_COUNTS: SeverityCounts = { critical: 0, error: 0, warning: 0, info: 0, none: 0 };
 
@@ -62,10 +63,8 @@ export default function HomePage() {
     await Promise.allSettled(
       ams.map(async (am) => {
         try {
-          const res = await fetch(`/api/alerts?amId=${am.id}`);
-          const results: AlertManagerStatus[] = await res.json();
-          const result = results[0];
-          if (result) setData((prev) => prev.map((d) => d.alertManager.id === am.id ? { ...result, loading: false } : d));
+          const result = await fetchAMAlerts(am);
+          setData((prev) => prev.map((d) => d.alertManager.id === am.id ? { ...result, loading: false } : d));
         } catch {
           setData((prev) => prev.map((d) => d.alertManager.id === am.id ? { ...d, loading: false } : d));
         }

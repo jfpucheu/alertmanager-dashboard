@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRefreshInterval } from '@/hooks/useRefreshInterval';
 import SilenceModal from '@/components/SilenceModal';
 import { AMSilences, AlertManager, Silence } from '@/types/alertmanager';
+import { fetchAMSilences, extendAMSilence, expireAMSilence } from '@/lib/fetch-am';
 
 interface FlatSilence {
   silence: Silence;
@@ -63,10 +64,8 @@ export default function SilencesPage() {
     await Promise.allSettled(
       ams.map(async (am) => {
         try {
-          const res = await fetch(`/api/silences?amId=${am.id}`);
-          const results: AMSilences[] = await res.json();
-          const result = results[0];
-          if (result) setData((prev) => prev.map((d) => d.alertManager.id === am.id ? { ...result, loading: false } : d));
+          const result = await fetchAMSilences(am);
+          setData((prev) => prev.map((d) => d.alertManager.id === am.id ? { ...result, loading: false } : d));
         } catch {
           setData((prev) => prev.map((d) => d.alertManager.id === am.id ? { ...d, loading: false } : d));
         }
@@ -86,26 +85,28 @@ export default function SilencesPage() {
   }, [fetchData, refreshInterval]);
 
   async function handleExtend(amId: string, silence: Silence, extraMs: number) {
+    const am = alertManagers.find((a) => a.id === amId);
+    if (!am) return;
     setExtending(silence.id);
     try {
-      const res = await fetch('/api/silences', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ alertManagerId: amId, silence, extraMs }),
-      });
-      if (!res.ok) { const d = await res.json(); throw new Error(d.error ?? 'Failed'); }
+      await extendAMSilence(am, silence, extraMs);
       await fetchData();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed');
     } finally {
       setExtending(null);
     }
   }
 
   async function handleExpire(amId: string, silenceId: string) {
-    if (!confirm('Expirer ce silence ?')) return;
+    const am = alertManagers.find((a) => a.id === amId);
+    if (!am || !confirm('Expirer ce silence ?')) return;
     setExpiring(silenceId);
     try {
-      await fetch(`/api/silences?amId=${amId}&silenceId=${silenceId}`, { method: 'DELETE' });
+      await expireAMSilence(am, silenceId);
       await fetchData();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed');
     } finally {
       setExpiring(null);
     }

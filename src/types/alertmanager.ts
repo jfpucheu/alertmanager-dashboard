@@ -2,16 +2,25 @@ export type Severity = 'critical' | 'error' | 'warning' | 'info' | 'none';
 
 export const SEVERITIES: Severity[] = ['critical', 'error', 'warning', 'info', 'none'];
 
+export type FetchMode = 'server' | 'browser';
+
 export interface AlertManager {
   id: string;
   name: string;
   url: string;
   createdAt: string;
-  /** Custom proxy for this AlertManager. Overrides the global proxy. */
+  /**
+   * 'server' (default): the Next.js server proxies calls to alertmanager.
+   *   Supports proxy + TLS override. Requires server → alertmanager network path.
+   * 'browser': the user's browser calls alertmanager directly.
+   *   Requires browser → alertmanager network path + CORS on alertmanager.
+   */
+  fetchMode?: FetchMode;
+  /** Custom proxy for this AlertManager. Overrides the global proxy. Server mode only. */
   proxy?: string;
-  /** If true, bypass the global proxy for this AlertManager. */
+  /** If true, bypass the global proxy for this AlertManager. Server mode only. */
   noProxy?: boolean;
-  /** If true, ignore TLS certificate errors (self-signed, expired…). */
+  /** If true, ignore TLS certificate errors (self-signed, expired…). Server mode only. */
   insecure?: boolean;
 }
 

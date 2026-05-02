@@ -6,6 +6,7 @@ import AddAlertManagerModal from '@/components/AddAlertManagerModal';
 import SilenceModal from '@/components/SilenceModal';
 import { AlertManagerStatus, AlertManager, Alert, Severity, SEVERITIES, AssignmentMap } from '@/types/alertmanager';
 import AssignCell from '@/components/AssignCell';
+import { fetchAMAlerts } from '@/lib/fetch-am';
 
 function ProxyBadge({ am }: { am: AlertManager }) {
   if (am.noProxy) {
@@ -22,6 +23,21 @@ function InsecureBadge({ am }: { am: AlertManager }) {
   return (
     <span className="text-xs bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded" title="TLS certificate errors ignored">
       TLS non vérifié
+    </span>
+  );
+}
+
+function FetchModeBadge({ am }: { am: AlertManager }) {
+  if (am.fetchMode === 'browser') {
+    return (
+      <span className="text-xs bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded" title="Le navigateur appelle alertmanager directement">
+        🌐 browser
+      </span>
+    );
+  }
+  return (
+    <span className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 px-1.5 py-0.5 rounded" title="Le serveur proxifie les appels">
+      🖥 server
     </span>
   );
 }
@@ -72,10 +88,8 @@ export default function AlertManagersPage() {
     await Promise.allSettled(
       ams.map(async (am) => {
         try {
-          const res = await fetch(`/api/alerts?amId=${am.id}`);
-          const results: AlertManagerStatus[] = await res.json();
-          const result = results[0];
-          if (result) setData((prev) => prev.map((d) => d.alertManager.id === am.id ? { ...result, loading: false } : d));
+          const result = await fetchAMAlerts(am);
+          setData((prev) => prev.map((d) => d.alertManager.id === am.id ? { ...result, loading: false } : d));
         } catch {
           setData((prev) => prev.map((d) => d.alertManager.id === am.id ? { ...d, loading: false } : d));
         }
@@ -149,6 +163,7 @@ export default function AlertManagersPage() {
                     {!item.loading && !item.reachable && (
                       <span className="text-xs bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300 px-2 py-0.5 rounded">Unreachable</span>
                     )}
+                    <FetchModeBadge am={item.alertManager} />
                     <ProxyBadge am={item.alertManager} />
                     <InsecureBadge am={item.alertManager} />
                   </div>
